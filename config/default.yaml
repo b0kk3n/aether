@@ -1,0 +1,62 @@
+# Aether Configuration
+# Copy to ~/.aether/config.yaml to customize
+
+# Database location (default: ~/.aether/aether.db)
+# database_path: ~/.aether/aether.db
+
+# Default areas for task organization
+areas:
+  - work
+  - home
+  - training
+  - personal
+
+# Energy level defaults
+energy:
+  # Default energy to assume if not set
+  default: good
+  # How long before energy reading is considered stale (hours)
+  stale_after: 2
+
+# Task defaults
+tasks:
+  # Default priority for new tasks
+  default_priority: medium
+  # Default task type
+  default_type: routine
+  # Quick win threshold (minutes)
+  quick_win_threshold: 15
+
+# Reminder settings
+reminders:
+  # Default snooze duration (minutes)
+  default_snooze: 15
+  # Maximum snoozes allowed
+  max_snoozes: 3
+  # Medication reminder window (hours)
+  medication_window: 2
+
+# Briefing settings
+briefing:
+  # Number of priority tasks to show
+  priority_count: 5
+  # Hours ahead to show reminders
+  reminder_lookahead: 12
+  # Hours ahead to show events
+  event_lookahead: 24
+
+# Pattern learning
+patterns:
+  # Minimum samples before pattern is trusted
+  min_samples: 5
+  # Confidence threshold for using patterns
+  confidence_threshold: 0.6
+
+# Display settings
+display:
+  # Show task IDs in list views
+  show_ids: true
+  # Date format
+  date_format: "%Y-%m-%d"
+  # Time format
+  time_format: "%H:%M"

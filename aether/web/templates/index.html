@@ -609,6 +609,99 @@
         </div>
     </div>
 
+    <!-- Add Chore Modal -->
+    <div class="modal" id="choreModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Add Chore</div>
+                <div class="modal-close" onclick="hideModal()">×</div>
+            </div>
+            <input type="text" class="input" id="choreName" placeholder="Chore name (e.g., Vacuum)" autofocus>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px; display: block;">How often? (days)</label>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                    <button class="time-btn" onclick="selectInterval(3)">3</button>
+                    <button class="time-btn" onclick="selectInterval(7)">7</button>
+                    <button class="time-btn" onclick="selectInterval(14)">14</button>
+                    <button class="time-btn" onclick="selectInterval(30)">30</button>
+                </div>
+                <input type="number" class="input" id="choreInterval" placeholder="7" style="margin-top: 8px;" value="7">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px; display: block;">Duration (minutes)</label>
+                <input type="number" class="input" id="choreDuration" placeholder="15" value="15">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px; display: block;">Priority</label>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                    <button class="time-btn" onclick="selectPriority(1)">🔴 Critical</button>
+                    <button class="time-btn" onclick="selectPriority(2)">🟠 High</button>
+                    <button class="time-btn" onclick="selectPriority(3)" style="background: var(--accent); color: white;">🟡 Med</button>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 6px;">
+                    <button class="time-btn" onclick="selectPriority(4)">🟢 Low</button>
+                    <button class="time-btn" onclick="selectPriority(5)">⚪ Whenever</button>
+                </div>
+                <input type="hidden" id="chorePriority" value="3">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 13px; color: var(--text-dim); margin-bottom: 8px; display: block;">Rooms (optional)</label>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;" id="roomCheckboxes">
+                    <label class="checkbox-btn">
+                        <input type="checkbox" value="living_room"> Living Room
+                    </label>
+                    <label class="checkbox-btn">
+                        <input type="checkbox" value="bedroom"> Bedroom
+                    </label>
+                    <label class="checkbox-btn">
+                        <input type="checkbox" value="kitchen"> Kitchen
+                    </label>
+                    <label class="checkbox-btn">
+                        <input type="checkbox" value="bathroom"> Bathroom
+                    </label>
+                    <label class="checkbox-btn">
+                        <input type="checkbox" value="office"> Office
+                    </label>
+                    <label class="checkbox-btn">
+                        <input type="checkbox" value="hallway"> Hallway
+                    </label>
+                </div>
+            </div>
+
+            <button class="quick-btn primary" style="width: 100%;" onclick="addChore()">Add Chore</button>
+        </div>
+    </div>
+
+    <style>
+        .checkbox-btn {
+            padding: 10px 12px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .checkbox-btn:has(input:checked) {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .checkbox-btn input[type="checkbox"] {
+            margin: 0;
+        }
+    </style>
+
     <script>
         const API = '';  // Same origin
         let currentEnergy = 'good';
@@ -804,8 +897,12 @@
                         <div class="empty-icon">⟳</div>
                         <div>No chores set up yet</div>
                     </div>
+                    <button class="quick-btn primary" style="margin-top: 16px;" onclick="showChoreModal()">+ Add Your First Chore</button>
                 `;
             } else {
+                // Add button to create new chore
+                html += '<button class="quick-btn" style="margin-bottom: 16px;" onclick="showChoreModal()">+ Add Chore</button>';
+
                 html += '<div class="section">';
                 chores.sort((a, b) => (b.urgency_score || 0) - (a.urgency_score || 0));
                 chores.forEach(c => {
@@ -817,15 +914,30 @@
                         else dueText = `Due in ${daysUntil}d`;
                     }
 
+                    // Priority indicator
+                    const priorityColors = ['🔴', '🟠', '🟡', '🟢', '⚪'];
+                    const priorityIcon = priorityColors[c.priority - 1] || '🟡';
+
                     html += `
                         <div class="card">
                             <div class="chore">
                                 <div class="chore-info">
-                                    <div class="chore-name">${c.name}</div>
+                                    <div class="chore-name">${priorityIcon} ${c.name}</div>
                                     <div class="chore-meta">
-                                        ${c.room ? `${c.room} · ` : ''}${c.duration_minutes}min · ${dueText}
-                                    </div>
-                                </div>
+                                        ${c.duration_minutes}min · ${dueText}
+                                    </div>`;
+
+                    // Show pending rooms if multi-room chore
+                    if (c.rooms && c.rooms.length > 0 && c.pending_rooms && c.pending_rooms.length > 0) {
+                        html += `<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">`;
+                        c.pending_rooms.forEach(room => {
+                            const roomLabel = room.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            html += `<span style="font-size: 11px; padding: 3px 8px; background: var(--surface-hover); border-radius: 8px; border: 1px solid var(--border);">${roomLabel}</span>`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    html += `</div>
                                 ${c.streak > 0 ? `<div class="chore-streak">🔥 ${c.streak}</div>` : ''}
                                 <button class="quick-btn" style="flex: none; padding: 8px 16px; margin-left: 12px;" onclick="completeChore('${c.id}')">Done</button>
                             </div>
@@ -931,9 +1043,55 @@
             showView(currentView);
         }
 
-        async function completeChore(id) {
-            await api(`/api/chores/${id}/done`, 'POST');
+        async function completeChore(id, rooms = null) {
+            await api(`/api/chores/${id}/done`, 'POST', rooms ? { rooms } : null);
             showView(currentView);
+        }
+
+        async function addChore() {
+            const name = document.getElementById('choreName').value.trim();
+            if (!name) return;
+
+            const interval = parseInt(document.getElementById('choreInterval').value) || 7;
+            const duration = parseInt(document.getElementById('choreDuration').value) || 15;
+            const priority = parseInt(document.getElementById('chorePriority').value) || 3;
+
+            // Get selected rooms
+            const roomCheckboxes = document.querySelectorAll('#roomCheckboxes input[type="checkbox"]:checked');
+            const rooms = Array.from(roomCheckboxes).map(cb => cb.value);
+
+            await api('/api/chores', 'POST', {
+                name,
+                interval_days: interval,
+                duration_minutes: duration,
+                priority,
+                rooms,
+            });
+
+            // Reset form
+            document.getElementById('choreName').value = '';
+            document.getElementById('choreInterval').value = '7';
+            document.getElementById('choreDuration').value = '15';
+            document.getElementById('chorePriority').value = '3';
+            roomCheckboxes.forEach(cb => cb.checked = false);
+
+            hideModal();
+            showView('chores');
+        }
+
+        function selectInterval(days) {
+            document.getElementById('choreInterval').value = days;
+        }
+
+        function selectPriority(priority) {
+            document.getElementById('chorePriority').value = priority;
+            // Update button styling
+            document.querySelectorAll('[onclick^="selectPriority"]').forEach(btn => {
+                btn.style.background = '';
+                btn.style.color = '';
+            });
+            event.target.style.background = 'var(--accent)';
+            event.target.style.color = 'white';
         }
 
         async function ackReminder(id) {
@@ -967,6 +1125,11 @@
 
         function showTimeModal() {
             document.getElementById('timeModal').classList.add('active');
+        }
+
+        function showChoreModal() {
+            document.getElementById('choreModal').classList.add('active');
+            document.getElementById('choreName').focus();
         }
 
         function hideModal() {

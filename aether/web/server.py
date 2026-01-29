@@ -41,7 +41,11 @@ class ChoreCreate(BaseModel):
     name: str
     interval_days: int = 7
     duration_minutes: int = 15
+    priority: int = 3
+    rooms: list[str] = []
     room: str | None = None
+    flexibility_days: int = 2
+    description: str = ""
 
 
 class VoiceCommand(BaseModel):
@@ -321,20 +325,24 @@ def create_app() -> FastAPI:
 
         new_chore = Chore(
             name=chore.name,
+            description=chore.description,
             interval_days=chore.interval_days,
             duration_minutes=chore.duration_minutes,
-            room=chore.room,
+            flexibility_days=chore.flexibility_days,
+            priority=chore.priority,
+            rooms=chore.rooms,
+            room=chore.room,  # Backwards compat
         )
         chores.add(new_chore)
         return new_chore.to_dict()
 
     @app.post("/api/chores/{chore_id}/done")
-    async def complete_chore(chore_id: str):
-        """Mark chore as done."""
+    async def complete_chore(chore_id: str, rooms: list[str] | None = None):
+        """Mark chore as done, optionally for specific rooms."""
         if not chores:
             raise HTTPException(status_code=503, detail="Not initialized")
 
-        chore = chores.complete(chore_id)
+        chore = chores.complete(chore_id, rooms=rooms)
         if not chore:
             raise HTTPException(status_code=404, detail="Chore not found")
         return chore.to_dict()

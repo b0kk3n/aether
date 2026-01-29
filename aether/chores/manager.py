@@ -1,5 +1,7 @@
 """Chore scheduling system - Kaji-style interval-based tasks."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -21,13 +23,16 @@ class Chore:
     interval_days: int = 7  # How often it should be done
     duration_minutes: int = 15  # How long it takes
     flexibility_days: int = 2  # How many days early/late is OK
+    priority: int = 3  # 1=critical, 2=high, 3=medium, 4=low, 5=whenever
 
-    # Location/Room
-    room: str | None = None  # living_room, bathroom, kitchen, etc.
+    # Location/Room - supports multiple rooms
+    rooms: list[str] = field(default_factory=list)  # ["living_room", "bedroom", ...]
+    room: str | None = None  # Legacy single room (for backwards compat)
     zone: str | None = None  # indoor, outdoor, garage, etc.
 
-    # Tracking
-    last_completed: datetime | None = None
+    # Tracking - per room if rooms are specified
+    room_completions: dict[str, datetime] = field(default_factory=dict)  # room -> last completed
+    last_completed: datetime | None = None  # Overall last completion (any room)
     completion_count: int = 0
     streak: int = 0  # Consecutive on-time completions
 
@@ -42,28 +47,58 @@ class Chore:
     created_at: datetime = field(default_factory=datetime.now)
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def get_room_due_date(self, room: str | None = None) -> datetime | None:
+        """Calculate when this chore is due for a specific room."""
+        if room and room in self.room_completions:
+            return self.room_completions[room] + timedelta(days=self.interval_days)
+        elif not room and self.last_completed:
+            return self.last_completed + timedelta(days=self.interval_days)
+        return datetime.now()  # Never done
+
+    def is_room_due(self, room: str | None = None) -> bool:
+        """Check if chore is due for a specific room."""
+        due_date = self.get_room_due_date(room)
+        if not due_date:
+            return True
+        window_start = due_date - timedelta(days=self.flexibility_days)
+        return datetime.now() >= window_start
+
+    def is_room_overdue(self, room: str | None = None) -> bool:
+        """Check if chore is overdue for a specific room."""
+        due_date = self.get_room_due_date(room)
+        if not due_date:
+            return True
+        window_end = due_date + timedelta(days=self.flexibility_days)
+        return datetime.now() > window_end
+
+    def get_pending_rooms(self) -> list[str]:
+        """Get list of rooms where chore is due or overdue."""
+        if not self.rooms:
+            return []
+        return [room for room in self.rooms if self.is_room_due(room)]
+
     @property
     def due_date(self) -> datetime | None:
-        """Calculate when this chore is due."""
-        if not self.last_completed:
-            return datetime.now()  # Never done, due now
-        return self.last_completed + timedelta(days=self.interval_days)
+        """Calculate when this chore is due (earliest among all rooms)."""
+        if self.rooms:
+            # Multi-room: find earliest due date
+            due_dates = [self.get_room_due_date(room) for room in self.rooms]
+            return min(d for d in due_dates if d) if due_dates else datetime.now()
+        return self.get_room_due_date(None)
 
     @property
     def is_due(self) -> bool:
-        """Check if chore is due (within flexibility window)."""
-        if not self.due_date:
-            return True
-        window_start = self.due_date - timedelta(days=self.flexibility_days)
-        return datetime.now() >= window_start
+        """Check if chore is due (any room)."""
+        if self.rooms:
+            return any(self.is_room_due(room) for room in self.rooms)
+        return self.is_room_due(None)
 
     @property
     def is_overdue(self) -> bool:
-        """Check if chore is overdue (past due date + flexibility)."""
-        if not self.due_date:
-            return True  # Never done
-        window_end = self.due_date + timedelta(days=self.flexibility_days)
-        return datetime.now() > window_end
+        """Check if chore is overdue (any room)."""
+        if self.rooms:
+            return any(self.is_room_overdue(room) for room in self.rooms)
+        return self.is_room_overdue(None)
 
     @property
     def days_until_due(self) -> int:
@@ -80,14 +115,20 @@ class Chore:
 
         days = self.days_until_due
 
+        # Adjust by priority (1=critical, 5=whenever)
+        priority_multiplier = 1.0 + (3 - self.priority) * 0.15
+
+        base_score = 0.0
         if days < -self.flexibility_days:
-            return 1.0  # Very overdue
+            base_score = 1.0  # Very overdue
         elif days < 0:
-            return 0.8 + (abs(days) / self.flexibility_days) * 0.2
+            base_score = 0.8 + (abs(days) / self.flexibility_days) * 0.2
         elif days < self.flexibility_days:
-            return 0.5 + ((self.flexibility_days - days) / self.flexibility_days) * 0.3
+            base_score = 0.5 + ((self.flexibility_days - days) / self.flexibility_days) * 0.3
         else:
-            return max(0.1, 0.5 - (days / self.interval_days) * 0.4)
+            base_score = max(0.1, 0.5 - (days / self.interval_days) * 0.4)
+
+        return min(1.0, base_score * priority_multiplier)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -98,8 +139,11 @@ class Chore:
             "interval_days": self.interval_days,
             "duration_minutes": self.duration_minutes,
             "flexibility_days": self.flexibility_days,
+            "priority": self.priority,
+            "rooms": self.rooms,
             "room": self.room,
             "zone": self.zone,
+            "room_completions": {room: dt.isoformat() for room, dt in self.room_completions.items()},
             "last_completed": self.last_completed.isoformat() if self.last_completed else None,
             "completion_count": self.completion_count,
             "streak": self.streak,
@@ -108,11 +152,22 @@ class Chore:
             "active": self.active,
             "created_at": self.created_at.isoformat(),
             "metadata": self.metadata,
+            "pending_rooms": self.get_pending_rooms(),
+            "urgency_score": self.urgency_score,
+            "days_until_due": self.days_until_due,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Chore":
         """Create from dictionary."""
+        # Parse room_completions
+        room_completions = {}
+        if "room_completions" in data:
+            room_completions = {
+                room: datetime.fromisoformat(dt_str)
+                for room, dt_str in data["room_completions"].items()
+            }
+
         return cls(
             id=data["id"],
             name=data["name"],
@@ -120,8 +175,11 @@ class Chore:
             interval_days=data.get("interval_days", 7),
             duration_minutes=data.get("duration_minutes", 15),
             flexibility_days=data.get("flexibility_days", 2),
+            priority=data.get("priority", 3),
+            rooms=data.get("rooms", []),
             room=data.get("room"),
             zone=data.get("zone"),
+            room_completions=room_completions,
             last_completed=datetime.fromisoformat(data["last_completed"]) if data.get("last_completed") else None,
             completion_count=data.get("completion_count", 0),
             streak=data.get("streak", 0),
@@ -226,22 +284,52 @@ class ChoreManager:
         chores = self.list(active_only=True)
         return [c for c in chores if c.is_overdue]
 
-    def complete(self, chore_id: str) -> Chore | None:
-        """Mark a chore as complete."""
+    def complete(self, chore_id: str, rooms: list[str] | None = None) -> Chore | None:
+        """Mark a chore as complete, optionally for specific rooms.
+
+        Args:
+            chore_id: ID of the chore
+            rooms: Optional list of specific rooms to mark as complete
+                   If None and chore has rooms, marks all pending rooms as complete
+                   If None and chore has no rooms, marks overall chore as complete
+        """
         chore = self.get(chore_id)
         if not chore:
             return None
 
         now = datetime.now()
 
-        # Update streak
-        if chore.due_date and not chore.is_overdue:
-            chore.streak += 1
-        else:
-            chore.streak = 1  # Reset streak if overdue
+        # Multi-room chore
+        if chore.rooms:
+            # Determine which rooms to complete
+            rooms_to_complete = rooms if rooms else chore.get_pending_rooms()
+            if not rooms_to_complete:
+                rooms_to_complete = chore.rooms  # Complete all if none pending
 
-        chore.last_completed = now
-        chore.completion_count += 1
+            # Mark each room as complete
+            for room in rooms_to_complete:
+                if room in chore.rooms:
+                    chore.room_completions[room] = now
+
+            # Update overall tracking
+            chore.last_completed = now
+            chore.completion_count += 1
+
+            # Update streak based on worst-case room
+            if any(chore.is_room_overdue(room) for room in rooms_to_complete):
+                chore.streak = 1  # Reset if any room was overdue
+            else:
+                chore.streak += 1
+
+        # Single/general chore
+        else:
+            if chore.due_date and not chore.is_overdue:
+                chore.streak += 1
+            else:
+                chore.streak = 1
+
+            chore.last_completed = now
+            chore.completion_count += 1
 
         self._save_chore(chore)
         self.store.log_activity(
@@ -250,6 +338,7 @@ class ChoreManager:
             chore.id,
             {
                 "name": chore.name,
+                "rooms": rooms_to_complete if chore.rooms else None,
                 "streak": chore.streak,
                 "on_time": not chore.is_overdue,
             },

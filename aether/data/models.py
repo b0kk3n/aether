@@ -1,5 +1,7 @@
 """Data models for Aether."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum

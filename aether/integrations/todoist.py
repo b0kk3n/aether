@@ -1,5 +1,7 @@
 """Todoist integration for syncing tasks."""
 
+from __future__ import annotations
+
 import asyncio
 from datetime import datetime, timedelta
 from typing import Any
@@ -50,7 +52,9 @@ class TodoistSync:
         await self._refresh_caches()
 
         # Get all active tasks from Todoist
-        todoist_tasks = await self.async_api.get_tasks()
+        todoist_tasks = []
+        async for task in self.async_api.get_tasks():
+            todoist_tasks.append(task)
 
         synced = 0
         created = 0
@@ -87,10 +91,14 @@ class TodoistSync:
     async def _refresh_caches(self) -> None:
         """Refresh project and label caches."""
         try:
-            projects = await self.async_api.get_projects()
+            projects = []
+            async for p in self.async_api.get_projects():
+                projects.append(p)
             self._project_cache = {p.id: p.name for p in projects}
 
-            labels = await self.async_api.get_labels()
+            labels = []
+            async for l in self.async_api.get_labels():
+                labels.append(l)
             self._label_cache = {l.id: l.name for l in labels}
         except Exception as e:
             logger.warning(f"Failed to refresh caches: {e}")
@@ -169,7 +177,7 @@ class TodoistSync:
             metadata={
                 "todoist_id": todoist.id,
                 "todoist_project_id": todoist.project_id,
-                "todoist_created": todoist.created_at,
+                "todoist_created": todoist.created_at if isinstance(todoist.created_at, str) else (todoist.created_at.isoformat() if hasattr(todoist.created_at, 'isoformat') else str(todoist.created_at)),
                 "todoist_synced": datetime.now().isoformat(),
             },
         )
@@ -197,14 +205,37 @@ class TodoistSync:
             return None
 
         try:
-            if due.datetime:
+            # Check if due is a string (direct date)
+            if isinstance(due, str):
+                return datetime.fromisoformat(due.replace("Z", "+00:00"))
+
+            # Check for datetime attribute (with time)
+            if hasattr(due, 'datetime') and due.datetime:
                 return datetime.fromisoformat(due.datetime.replace("Z", "+00:00"))
-            elif due.date:
-                return datetime.strptime(due.date, "%Y-%m-%d").replace(
-                    hour=23, minute=59, second=59
-                )
-        except (ValueError, AttributeError) as e:
-            logger.warning(f"Failed to parse due date: {e}")
+
+            # Check for date attribute (date only)
+            if hasattr(due, 'date') and due.date:
+                if isinstance(due.date, str):
+                    return datetime.strptime(due.date, "%Y-%m-%d").replace(
+                        hour=23, minute=59, second=59
+                    )
+                else:
+                    # due.date is already a datetime.date object
+                    return datetime.combine(due.date, datetime.max.time()).replace(
+                        hour=23, minute=59, second=59
+                    )
+
+            # Try accessing as dict
+            if isinstance(due, dict):
+                if 'datetime' in due and due['datetime']:
+                    return datetime.fromisoformat(due['datetime'].replace("Z", "+00:00"))
+                elif 'date' in due and due['date']:
+                    return datetime.strptime(due['date'], "%Y-%m-%d").replace(
+                        hour=23, minute=59, second=59
+                    )
+
+        except (ValueError, AttributeError, TypeError) as e:
+            logger.warning(f"Failed to parse due date {due}: {e}")
 
         return None
 
@@ -318,7 +349,66 @@ class TodoistSync:
 
     def sync_blocking(self) -> dict[str, Any]:
         """Synchronous sync wrapper."""
-        return asyncio.run(self.sync())
+        logger.info("Starting Todoist sync")
+
+        # Refresh caches
+        try:
+            # The paginator yields pages (lists), so we need to flatten them
+            projects = []
+            for page in self.api.get_projects():
+                projects.extend(page if isinstance(page, list) else [page])
+            self._project_cache = {p.id: p.name for p in projects}
+
+            labels = []
+            for page in self.api.get_labels():
+                labels.extend(page if isinstance(page, list) else [page])
+            self._label_cache = {l.id: l.name for l in labels}
+
+            logger.info("Cache refresh successful")
+        except Exception as e:
+            logger.warning(f"Failed to refresh caches: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # Get all active tasks from Todoist (returns a paginator that yields pages)
+        synced = 0
+        created = 0
+        updated = 0
+        todoist_tasks = []
+
+        for page in self.api.get_tasks():
+            page_tasks = page if isinstance(page, list) else [page]
+            for todoist_task in page_tasks:
+                todoist_tasks.append(todoist_task)
+
+                # Check if we have this task locally
+                local_task = self._find_local_task(todoist_task.id)
+
+                if local_task:
+                    # Update local task if Todoist version is newer
+                    if self._needs_update(local_task, todoist_task):
+                        self._update_local_task(local_task, todoist_task)
+                        updated += 1
+                else:
+                    # Create new local task
+                    self._create_local_task(todoist_task)
+                    created += 1
+
+                synced += 1
+
+        logger.info(f"Synced {synced} tasks")
+
+        # Handle completed tasks (mark local tasks as done if not in Todoist)
+        self._sync_completed_tasks(todoist_tasks)
+
+        logger.info(f"Sync complete: {synced} synced, {created} created, {updated} updated")
+
+        return {
+            "synced": synced,
+            "created": created,
+            "updated": updated,
+            "timestamp": datetime.now().isoformat(),
+        }
 
     async def get_todoist_projects(self) -> list[dict[str, str]]:
         """Get all Todoist projects."""

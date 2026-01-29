@@ -1,33 +1,56 @@
 [project]
 name = "aether"
-version = "0.1.0"
-description = "Aether - Adaptive Personal Assistant for ADHD-friendly task and life management"
+version = "0.2.0"
+description = "Personal command center - one interface for everything that needs doing"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
+    # Web framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+
+    # CLI
     "click>=8.1.0",
     "rich>=13.0.0",
+
+    # Data & Config
     "pyyaml>=6.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+
+    # Date/Time
     "python-dateutil>=2.8.0",
     "humanize>=4.0.0",
-    "prompt-toolkit>=3.0.0",
     "croniter>=1.3.0",
+
+    # Integrations
+    "todoist-api-python>=2.1.0",
+    "aiohttp>=3.9.0",
+    "httpx>=0.26.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.0.0",
-    "black>=23.0.0",
+    "black>=24.0.0",
     "ruff>=0.1.0",
 ]
-ai = [
-    "anthropic>=0.18.0",
+google = [
+    "google-api-python-client>=2.100.0",
+    "google-auth-oauthlib>=1.2.0",
+]
+voice = [
+    "openai-whisper>=20231117",
+]
+all = [
+    "aether[google,voice]",
 ]
 
 [project.scripts]
 aether = "aether.cli:main"
-ae = "aether.cli:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -35,10 +58,14 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["aether*"]
+
+[tool.setuptools.package-data]
+"aether.web" = ["static/**/*", "templates/**/*"]
 
 [tool.black]
 line-length = 100
-target-version = ["py310"]
+target-version = ["py311"]
 
 [tool.ruff]
 line-length = 100

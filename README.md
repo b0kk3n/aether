@@ -1,210 +1,182 @@
 # Aether
 
-Adaptive personal assistant designed for ADHD-friendly task and life management.
+Your personal command center. One interface for everything that needs doing.
+
+## What Aether Does
+
+Aether sits on top of your existing tools (Todoist, Google Calendar, Home Assistant) and provides:
+
+- **Morning Briefing** - What matters today, what's at risk
+- **"I have 20 minutes"** - Instant task recommendations for available time
+- **Voice Capture** - Add tasks, notes, or queries by voice
+- **Smart Chores** - Interval-based tasks that surface when due (like Kaji)
+- **Project Tracking** - Multi-step projects with progress
+- **Home Integration** - Triggers and context from Home Assistant
 
 ## Philosophy
 
-Aether reduces cognitive load by surfacing the right thing at the right time, adapting to your energy and motivation levels rather than rigid schedules.
+**The system manages itself.** You dump everything in, Aether organizes and surfaces what matters. No filing, no tagging marathons, no system maintenance.
 
-**Core principles:**
-- Proactive, not reactive - surfaces what matters before you ask
-- Energy-aware - matches tasks to your current capacity
-- Pattern-learning - gets better the more you use it
-- Zero fluff - fast, structured responses
+## Architecture
 
-## Installation
-
-```bash
-# Install from source
-pip install -e .
-
-# Or with AI features (optional)
-pip install -e ".[ai]"
+```
+┌──────────────────────────────────────────────────────┐
+│                    Aether Core                        │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐    │
+│  │  Briefings  │ │  Scheduler  │ │   Context   │    │
+│  └─────────────┘ └─────────────┘ └─────────────┘    │
+├──────────────────────────────────────────────────────┤
+│                   Integrations                        │
+│  ┌─────────┐ ┌──────────┐ ┌────────────────────┐    │
+│  │ Todoist │ │ Google   │ │  Home Assistant    │    │
+│  │  Sync   │ │ Calendar │ │  Sensors/Triggers  │    │
+│  └─────────┘ └──────────┘ └────────────────────┘    │
+├──────────────────────────────────────────────────────┤
+│                    Interfaces                         │
+│  ┌─────────┐ ┌──────────┐ ┌────────────────────┐    │
+│  │ Mobile  │ │    HA    │ │   Voice/Whisper    │    │
+│  │   PWA   │ │Dashboard │ │                    │    │
+│  └─────────┘ └──────────┘ └────────────────────┘    │
+└──────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
 
 ```bash
-# Add tasks quickly
-aether add "Buy groceries #shopping @errands"
-aether add "Review PR !high due:tomorrow @work est:30m"
+# Install
+pip install -e .
 
-# See what to do next (context-aware)
-aether next
+# Configure integrations
+aether setup
 
-# Morning briefing
-aether morning
+# Start server
+aether serve
 
-# Set your energy level
-aether energy low
-
-# Quick wins for low energy moments
-aether quick
-
-# Mark complete
-aether done <task-id>
+# Access UI at http://localhost:8080
+# Or add to Home Assistant
 ```
-
-## Task Syntax
-
-Quick add supports shortcuts:
-- `#tag` - Add tags
-- `@area` - Set area (work, home, training, etc.)
-- `+project` - Set project
-- `!priority` - Set priority (critical, high, med, low, someday)
-- `due:DATE` - Set due date (today, tomorrow, mon-sun, YYYY-MM-DD, 3d)
-- `est:TIME` - Set time estimate (30m, 2h)
-- `type:TYPE` - Set task type (creative, admin, routine, deep, quick, errand, comm)
-
-## Commands
-
-### Tasks
-
-| Command | Description |
-|---------|-------------|
-| `add <text>` | Quick add a task |
-| `done <id>` | Complete a task |
-| `start <id>` | Start working on a task |
-| `block <id>` | Mark task as blocked |
-| `unblock <id>` | Unblock a task |
-| `list` | List all active tasks |
-| `inbox` | Show inbox items |
-| `promote <id>` | Move from inbox to TODO |
-| `next` | Get recommended next tasks |
-| `quick` | Get quick win tasks |
-| `today` | Tasks due today |
-| `overdue` | Show overdue tasks |
-| `blocked` | Show blocked tasks |
-
-### Context & Energy
-
-| Command | Description |
-|---------|-------------|
-| `energy <level>` | Set energy (peak/good/low/depleted) |
-| `focus` | Toggle focus mode |
-| `break` | Record taking a break |
-
-### Briefings
-
-| Command | Description |
-|---------|-------------|
-| `morning` | Daily briefing |
-| `weekly` | Weekly review |
-| (no command) | Quick status |
-
-### Reminders
-
-| Command | Description |
-|---------|-------------|
-| `remind <text> --at <time>` | Add reminder |
-| `med <name> --at <time>` | Medication reminder |
-| `reminders` | Show upcoming |
-| `snooze <id>` | Snooze reminder |
-| `ack <id>` | Acknowledge reminder |
-
-### Memory
-
-| Command | Description |
-|---------|-------------|
-| `remember <key> <value>` | Store a memory |
-| `recall <key>` | Retrieve a memory |
-
-### Analytics
-
-| Command | Description |
-|---------|-------------|
-| `workload` | Analyze current workload |
-| `productivity` | Today's productivity score |
-| `stats` | Overall statistics |
-
-### Organization
-
-| Command | Description |
-|---------|-------------|
-| `areas` | List all areas |
-| `projects` | List all projects |
-| `show <name>` | Show tasks for area/project |
-
-## Energy Levels
-
-Aether adapts recommendations to your energy:
-
-- **Peak** ⚡ - Creative work, complex decisions, deep focus
-- **Good** ✨ - Normal productive work
-- **Low** 🔋 - Admin tasks, routine work
-- **Depleted** 😴 - Only essentials, quick wins
-
-Set your energy and Aether will prioritize matching tasks:
-
-```bash
-aether energy peak  # Ready for creative work
-aether energy low   # Show me admin tasks
-```
-
-## Adaptive Reminders
-
-Medication and other critical reminders use adaptive timing:
-- Set a target time and window
-- Aether triggers when you're in a good state within the window
-- Falls back to hard trigger if approaching window end
-
-```bash
-# Medication at 9am with 2-hour window, repeating daily
-aether med "Adderall" --at 09:00 --window 2 --daily
-```
-
-## Task Types
-
-| Type | Best Energy | Description |
-|------|-------------|-------------|
-| creative | Peak | New ideas, design, writing |
-| deep_work | Peak | Complex problem-solving |
-| admin | Low | Email, filing, updates |
-| routine | Low | Regular maintenance |
-| quick_win | Any | Under 15 minutes |
-| errand | Good | Location-dependent |
-| communication | Good | Calls, messages |
-
-## Pattern Learning
-
-Aether learns from your behavior:
-- When you complete different task types
-- Your energy patterns throughout the day
-- How accurate your time estimates are
-- Your most productive periods
-
-This improves recommendations over time without manual configuration.
-
-## Data Storage
-
-All data is stored locally in `~/.aether/`:
-- `aether.db` - SQLite database
-- `config.yaml` - User configuration (optional)
 
 ## Configuration
 
-Copy `config/default.yaml` to `~/.aether/config.yaml` and customize.
+Create `~/.aether/config.yaml`:
 
-## Python API
+```yaml
+# Todoist integration
+todoist:
+  api_token: "your_token_here"
+  sync_interval: 300  # seconds
 
-```python
-from aether import Aether
+# Google Calendar
+google:
+  credentials_file: "~/.aether/google_credentials.json"
+  calendars:
+    - primary
+    - family
 
-ae = Aether()
+# Home Assistant
+homeassistant:
+  url: "http://homeassistant.local:8123"
+  token: "your_long_lived_token"
 
-# Add task
-task = ae.add("Review PR @work !high due:tomorrow")
+# Voice transcription
+voice:
+  provider: "whisper"  # or "google", "azure"
+  language: "en"
 
-# Get recommendations
-for task, score, reasoning in ae.next(5):
-    print(f"{task.title}: {score}")
-
-# Set energy
-ae.energy("peak")
-
-# Morning briefing
-briefing = ae.morning()
+# Server
+server:
+  host: "0.0.0.0"
+  port: 8080
 ```
+
+## Features
+
+### Morning Briefing
+Start your day knowing exactly what matters:
+- Calendar events with prep time
+- Birthdays and social reminders
+- Overdue and due-today tasks
+- Chores that need attention
+- Weather and commute (via HA)
+
+### Time-Based Recommendations
+"I have 20 minutes" → Get tasks that fit:
+- Considers energy level
+- Accounts for location (home vs out)
+- Prioritizes overdue items
+- Suggests quick wins when time is short
+
+### Smart Chores (Kaji-style)
+Define once, forget about tracking:
+```yaml
+chores:
+  - name: "Vacuum living room"
+    interval: 7  # days
+    duration: 15  # minutes
+    room: living_room
+
+  - name: "Clean bathroom"
+    interval: 14
+    duration: 30
+    room: bathroom
+```
+
+Chores surface automatically when due. Complete them for satisfaction.
+
+### Voice Input
+Speak naturally:
+- "Add buy milk to groceries"
+- "Remind me to call mom on Sunday"
+- "What do I need to do today?"
+- "I finished vacuuming"
+
+### Home Assistant Integration
+
+**Dashboard Card:**
+```yaml
+type: custom:aether-card
+show_briefing: true
+show_tasks: 5
+show_chores: true
+```
+
+**Automations:**
+```yaml
+automation:
+  - alias: "Morning Briefing"
+    trigger:
+      - platform: time
+        at: "07:00:00"
+    action:
+      - service: aether.speak_briefing
+        data:
+          target: media_player.bedroom_speaker
+```
+
+**Sensors:**
+- `sensor.aether_tasks_due_today`
+- `sensor.aether_overdue_count`
+- `sensor.aether_next_event`
+- `sensor.aether_chores_due`
+
+## Mobile PWA
+
+Access via browser, install as app:
+- Works offline (syncs when connected)
+- Voice input button
+- Quick capture
+- Swipe to complete
+- Pull to refresh briefing
+
+## The Anti-Entropy System
+
+Aether prevents system collapse through:
+
+1. **Auto-organization** - Tasks are categorized by context, not manual folders
+2. **Decay prevention** - Nothing gets buried; old tasks surface with increasing urgency
+3. **Smart defaults** - New items get sensible due dates and priorities
+4. **Weekly review prompts** - Gentle nudges to process accumulated items
+5. **Project health** - Stalled projects get flagged
 
 ## License
 

@@ -658,5 +658,149 @@ def show(name, filter_type):
     print_tasks_table(tasks, title)
 
 
+# Server
+@main.command()
+@click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", "-p", default=8080, help="Port to bind to")
+@click.option("--reload", is_flag=True, help="Enable auto-reload")
+def serve(host, port, reload):
+    """Start the Aether web server."""
+    import uvicorn
+    from .web.server import create_app
+
+    console.print(f"[bold]Starting Aether server...[/bold]")
+    console.print(f"  URL: http://{host}:{port}")
+    console.print(f"  API: http://{host}:{port}/api")
+    console.print()
+
+    app = create_app()
+    uvicorn.run(
+        "aether.web.server:create_app",
+        host=host,
+        port=port,
+        reload=reload,
+        factory=True,
+    )
+
+
+# Setup wizard
+@main.command()
+def setup():
+    """Interactive setup wizard."""
+    import yaml
+    from pathlib import Path
+
+    console.print("[bold]Aether Setup Wizard[/bold]\n")
+
+    config = {}
+
+    # Todoist
+    console.print("[bold]1. Todoist Integration[/bold]")
+    todoist_token = click.prompt("  Todoist API token (or press Enter to skip)", default="", show_default=False)
+    if todoist_token:
+        config["todoist"] = {"api_token": todoist_token}
+
+    # Home Assistant
+    console.print("\n[bold]2. Home Assistant Integration[/bold]")
+    ha_url = click.prompt("  Home Assistant URL (or press Enter to skip)", default="", show_default=False)
+    if ha_url:
+        ha_token = click.prompt("  Long-lived access token")
+        config["homeassistant"] = {"url": ha_url, "token": ha_token}
+
+    # Save config
+    config_dir = Path.home() / ".aether"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_path = config_dir / "config.yaml"
+
+    with open(config_path, "w") as f:
+        yaml.dump(config, f, default_flow_style=False)
+
+    console.print(f"\n[green]✓[/green] Configuration saved to {config_path}")
+    console.print("\nNext steps:")
+    console.print("  1. Run 'aether serve' to start the web server")
+    console.print("  2. Access the UI at http://localhost:8080")
+    console.print("  3. Install the PWA on your phone for mobile access")
+
+
+# Chores
+@main.command()
+def chores():
+    """List chores."""
+    from .chores import ChoreManager
+
+    chore_mgr = ChoreManager(aether.store)
+    chore_list = chore_mgr.get_due()
+
+    if not chore_list:
+        console.print("[dim]No chores due.[/dim]")
+        return
+
+    table = Table(title="Chores Due", box=box.ROUNDED)
+    table.add_column("ID", style="dim", width=8)
+    table.add_column("Chore", min_width=25)
+    table.add_column("Room", width=12)
+    table.add_column("Time", width=8)
+    table.add_column("Status", width=12)
+
+    for c in chore_list:
+        status = "Overdue" if c.is_overdue else f"{c.days_until_due}d"
+        table.add_row(
+            c.id,
+            c.name,
+            c.room or "-",
+            f"{c.duration_minutes}m",
+            status,
+        )
+
+    console.print(table)
+
+
+@main.command()
+@click.argument("chore_id")
+def chore_done(chore_id):
+    """Mark a chore as done."""
+    from .chores import ChoreManager
+
+    chore_mgr = ChoreManager(aether.store)
+    chore = chore_mgr.complete(chore_id)
+
+    if chore:
+        streak_msg = f" 🔥 {chore.streak} streak!" if chore.streak > 1 else ""
+        console.print(f"[green]✓[/green] Completed: {chore.name}{streak_msg}")
+    else:
+        console.print(f"[red]✗[/red] Chore not found: {chore_id}")
+
+
+# Sync
+@main.command()
+def sync():
+    """Sync with external services."""
+    import asyncio
+
+    console.print("[bold]Syncing...[/bold]")
+
+    # Load config
+    from pathlib import Path
+    import yaml
+
+    config_path = Path.home() / ".aether" / "config.yaml"
+    if not config_path.exists():
+        console.print("[yellow]No config found. Run 'aether setup' first.[/yellow]")
+        return
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    # Todoist sync
+    if "todoist" in config:
+        from .integrations.todoist import TodoistSync
+
+        todoist = TodoistSync(config["todoist"]["api_token"], aether.store)
+        result = todoist.sync_blocking()
+        console.print(f"  Todoist: {result['synced']} tasks synced, {result['created']} new")
+
+    console.print("[green]✓[/green] Sync complete")
+
+
 if __name__ == "__main__":
     main()

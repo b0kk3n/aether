@@ -1,3 +1,6 @@
-"""Aether - Adaptive Personal Assistant."""
+"""Aether - Personal command center."""
 
-__version__ = "0.1.0"
+from .core.engine import Aether
+
+__version__ = "0.2.0"
+__all__ = ["Aether"]

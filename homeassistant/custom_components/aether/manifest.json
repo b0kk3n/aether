@@ -1,0 +1,11 @@
+{
+    "domain": "aether",
+    "name": "Aether",
+    "codeowners": [],
+    "config_flow": false,
+    "documentation": "https://github.com/yourusername/aether",
+    "iot_class": "local_polling",
+    "issue_tracker": "https://github.com/yourusername/aether/issues",
+    "requirements": [],
+    "version": "0.2.0"
+}

@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>Aether</title>
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface-hover: #1a1a25;
+            --border: #2a2a3a;
+            --text: #e0e0e0;
+            --text-dim: #808090;
+            --accent: #6366f1;
+            --accent-dim: #4f46e5;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --radius: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 0 16px;
+            padding-bottom: 100px;
+        }
+
+        /* Header */
+        header {
+            padding: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .energy-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .energy-badge:active {
+            transform: scale(0.95);
+        }
+
+        .energy-badge.peak { border-color: var(--accent); color: var(--accent); }
+        .energy-badge.good { border-color: var(--success); color: var(--success); }
+        .energy-badge.low { border-color: var(--warning); color: var(--warning); }
+        .energy-badge.depleted { border-color: var(--danger); color: var(--danger); }
+
+        /* Section */
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+        }
+
+        .section-action {
+            font-size: 13px;
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+        }
+
+        .card:active {
+            background: var(--surface-hover);
+        }
+
+        /* Task Item */
+        .task {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .task-check {
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .task-check:active {
+            transform: scale(0.9);
+        }
+
+        .task-check.done {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .task-check.done::after {
+            content: "✓";
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .task-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .task-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .task-meta {
+            font-size: 13px;
+            color: var(--text-dim);
+            display: flex;
+            gap: 12px;
+        }
+
+        .task-meta .overdue {
+            color: var(--danger);
+        }
+
+        .task-priority {
+            width: 4px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .task-priority.critical { background: var(--danger); }
+        .task-priority.high { background: var(--warning); }
+        .task-priority.medium { background: var(--accent); }
+
+        /* Chore Item */
+        .chore {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chore-info {
+            flex: 1;
+        }
+
+        .chore-name {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .chore-meta {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .chore-streak {
+            font-size: 13px;
+            color: var(--success);
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.danger { color: var(--danger); }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .quick-btn {
+            flex: 1;
+            padding: 14px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:active {
+            transform: scale(0.97);
+            background: var(--surface-hover);
+        }
+
+        .quick-btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        /* Time Picker */
+        .time-picker {
+            display: none;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .time-picker.active {
+            display: flex;
+        }
+
+        .time-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .time-btn:active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0;
+            padding-bottom: calc(8px + env(safe-area-inset-bottom));
+            z-index: 1000;
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px;
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 11px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--accent);
+        }
+
+        .nav-icon {
+            font-size: 22px;
+        }
+
+        /* Add Button */
+        .add-btn {
+            position: fixed;
+            bottom: calc(80px + env(safe-area-inset-bottom));
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+            transition: all 0.2s;
+            z-index: 100;
+        }
+
+        .add-btn:active {
+            transform: scale(0.9);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            align-items: flex-end;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            width: 100%;
+            background: var(--surface);
+            border-radius: var(--radius) var(--radius) 0 0;
+            padding: 20px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* Input */
+        .input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .input::placeholder {
+            color: var(--text-dim);
+        }
+
+        /* Briefing */
+        .briefing-greeting {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .briefing-summary {
+            color: var(--text-dim);
+            margin-bottom: 20px;
+        }
+
+        .warning-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            color: var(--danger);
+            font-size: 14px;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Voice Button */
+        .voice-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .voice-btn:active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .voice-btn.recording {
+            background: var(--danger);
+            border-color: var(--danger);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Hide scrollbar but allow scroll */
+        .app::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Empty state */
+        .empty {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-dim);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="app" id="app">
+        <header>
+            <div class="logo">Aether</div>
+            <div class="energy-badge good" id="energyBadge" onclick="showEnergyPicker()">
+                ✨ Good
+            </div>
+        </header>
+
+        <div id="content">
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Task Button -->
+    <button class="add-btn" onclick="showAddModal()">+</button>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="showView('home')">
+            <span class="nav-icon">◉</span>
+            <span>Today</span>
+        </div>
+        <div class="nav-item" onclick="showView('tasks')">
+            <span class="nav-icon">☐</span>
+            <span>Tasks</span>
+        </div>
+        <div class="nav-item" onclick="showView('chores')">
+            <span class="nav-icon">⟳</span>
+            <span>Chores</span>
+        </div>
+        <div class="nav-item" onclick="showView('whatnow')">
+            <span class="nav-icon">⏱</span>
+            <span>Now</span>
+        </div>
+    </nav>
+
+    <!-- Add Task Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Add Task</div>
+                <div class="modal-close" onclick="hideModal()">×</div>
+            </div>
+            <input type="text" class="input" id="taskInput" placeholder="What needs to be done?" autofocus>
+            <div style="display: flex; gap: 8px;">
+                <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">🎤</button>
+                <button class="quick-btn primary" style="flex: 1;" onclick="addTask()">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Energy Picker Modal -->
+    <div class="modal" id="energyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">How's your energy?</div>
+                <div class="modal-close" onclick="hideModal()">×</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button class="quick-btn" onclick="setEnergy('peak')">⚡ Peak</button>
+                <button class="quick-btn" onclick="setEnergy('good')">✨ Good</button>
+                <button class="quick-btn" onclick="setEnergy('low')">🔋 Low</button>
+                <button class="quick-btn" onclick="setEnergy('depleted')">😴 Depleted</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time Picker Modal -->
+    <div class="modal" id="timeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">How much time do you have?</div>
+                <div class="modal-close" onclick="hideModal()">×</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button class="quick-btn" onclick="whatNow(10)">10 min</button>
+                <button class="quick-btn" onclick="whatNow(20)">20 min</button>
+                <button class="quick-btn" onclick="whatNow(30)">30 min</button>
+                <button class="quick-btn" onclick="whatNow(60)">1 hour</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '';  // Same origin
+        let currentEnergy = 'good';
+        let currentView = 'home';
+
+        // API calls
+        async function api(endpoint, method = 'GET', body = null) {
+            const opts = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch(API + endpoint, opts);
+            return res.json();
+        }
+
+        // Views
+        async function showView(view) {
+            currentView = view;
+            document.querySelectorAll('.nav-item').forEach((el, i) => {
+                el.classList.toggle('active', ['home', 'tasks', 'chores', 'whatnow'][i] === view);
+            });
+
+            const content = document.getElementById('content');
+            content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            if (view === 'home') await renderHome();
+            else if (view === 'tasks') await renderTasks();
+            else if (view === 'chores') await renderChores();
+            else if (view === 'whatnow') showTimeModal();
+        }
+
+        async function renderHome() {
+            const [briefing, context] = await Promise.all([
+                api('/api/briefing'),
+                api('/api/context')
+            ]);
+
+            currentEnergy = context.energy_level;
+            updateEnergyBadge();
+
+            const content = document.getElementById('content');
+            const summary = briefing.summary || {};
+
+            let html = `
+                <div class="section">
+                    <div class="briefing-greeting">${briefing.greeting || 'Hello'}</div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-value${summary.overdue > 0 ? ' danger' : ''}">${summary.overdue || 0}</div>
+                        <div class="stat-label">Overdue</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${summary.due_today || 0}</div>
+                        <div class="stat-label">Due Today</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${summary.inbox || 0}</div>
+                        <div class="stat-label">Inbox</div>
+                    </div>
+                </div>
+            `;
+
+            // Warnings
+            if (briefing.warnings && briefing.warnings.length > 0) {
+                html += '<div class="section">';
+                briefing.warnings.forEach(w => {
+                    html += `<div class="warning-item">⚠️ ${w.message}</div>`;
+                });
+                html += '</div>';
+            }
+
+            // Priorities
+            if (briefing.priorities && briefing.priorities.length > 0) {
+                html += `
+                    <div class="section">
+                        <div class="section-header">
+                            <div class="section-title">Top Priorities</div>
+                        </div>
+                `;
+                briefing.priorities.forEach(p => {
+                    html += `
+                        <div class="card">
+                            <div class="task">
+                                <div class="task-check" onclick="completeTask('${p.id}')"></div>
+                                <div class="task-content">
+                                    <div class="task-title">${p.title}</div>
+                                    <div class="task-meta">
+                                        <span>${p.reason}</span>
+                                        ${p.due ? `<span>${p.due}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            // Reminders
+            if (briefing.reminders && briefing.reminders.length > 0) {
+                html += `
+                    <div class="section">
+                        <div class="section-header">
+                            <div class="section-title">Reminders</div>
+                        </div>
+                `;
+                briefing.reminders.forEach(r => {
+                    html += `
+                        <div class="card">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 500;">${r.title}</div>
+                                    <div class="task-meta">${r.time || 'Flexible'}</div>
+                                </div>
+                                <button class="quick-btn" style="flex: none; padding: 8px 16px;" onclick="ackReminder('${r.id}')">Done</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            content.innerHTML = html;
+        }
+
+        async function renderTasks() {
+            const tasks = await api('/api/tasks?limit=30');
+            const content = document.getElementById('content');
+
+            if (tasks.length === 0) {
+                content.innerHTML = `
+                    <div class="empty">
+                        <div class="empty-icon">✓</div>
+                        <div>No tasks yet</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="section">';
+            tasks.forEach(t => {
+                const priorityClass = t.priority <= 2 ? (t.priority === 1 ? 'critical' : 'high') : (t.priority === 3 ? 'medium' : '');
+                const isOverdue = t.due_date && new Date(t.due_date) < new Date();
+
+                html += `
+                    <div class="card">
+                        <div class="task">
+                            ${priorityClass ? `<div class="task-priority ${priorityClass}"></div>` : ''}
+                            <div class="task-check${t.status === 'done' ? ' done' : ''}" onclick="completeTask('${t.id}')"></div>
+                            <div class="task-content">
+                                <div class="task-title">${t.title}</div>
+                                <div class="task-meta">
+                                    ${t.area ? `<span>@${t.area}</span>` : ''}
+                                    ${t.due_date ? `<span class="${isOverdue ? 'overdue' : ''}">${formatDate(t.due_date)}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        async function renderChores() {
+            const chores = await api('/api/chores');
+            const stats = await api('/api/chores/stats');
+            const content = document.getElementById('content');
+
+            let html = `
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-value${stats.overdue > 0 ? ' danger' : ''}">${stats.overdue || 0}</div>
+                        <div class="stat-label">Overdue</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.due_now || 0}</div>
+                        <div class="stat-label">Due Now</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.longest_streak || 0}</div>
+                        <div class="stat-label">Best Streak</div>
+                    </div>
+                </div>
+            `;
+
+            if (chores.length === 0) {
+                html += `
+                    <div class="empty">
+                        <div class="empty-icon">⟳</div>
+                        <div>No chores set up yet</div>
+                    </div>
+                `;
+            } else {
+                html += '<div class="section">';
+                chores.sort((a, b) => (b.urgency_score || 0) - (a.urgency_score || 0));
+                chores.forEach(c => {
+                    const daysUntil = c.days_until_due;
+                    let dueText = 'Never done';
+                    if (daysUntil !== undefined) {
+                        if (daysUntil < 0) dueText = `${Math.abs(daysUntil)}d overdue`;
+                        else if (daysUntil === 0) dueText = 'Due today';
+                        else dueText = `Due in ${daysUntil}d`;
+                    }
+
+                    html += `
+                        <div class="card">
+                            <div class="chore">
+                                <div class="chore-info">
+                                    <div class="chore-name">${c.name}</div>
+                                    <div class="chore-meta">
+                                        ${c.room ? `${c.room} · ` : ''}${c.duration_minutes}min · ${dueText}
+                                    </div>
+                                </div>
+                                ${c.streak > 0 ? `<div class="chore-streak">🔥 ${c.streak}</div>` : ''}
+                                <button class="quick-btn" style="flex: none; padding: 8px 16px; margin-left: 12px;" onclick="completeChore('${c.id}')">Done</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            content.innerHTML = html;
+        }
+
+        async function renderWhatNow(minutes) {
+            hideModal();
+            const content = document.getElementById('content');
+            content.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            const result = await api('/api/whatnow', 'POST', { minutes });
+
+            let html = `
+                <div class="section">
+                    <div class="briefing-greeting">${minutes} minutes available</div>
+                    <div class="briefing-summary">${result.suggestion}</div>
+                </div>
+            `;
+
+            if (result.tasks.length > 0) {
+                html += `
+                    <div class="section">
+                        <div class="section-header">
+                            <div class="section-title">Recommended Tasks</div>
+                        </div>
+                `;
+                result.tasks.slice(0, 5).forEach(item => {
+                    const t = item.task;
+                    html += `
+                        <div class="card">
+                            <div class="task">
+                                <div class="task-check" onclick="completeTask('${t.id}')"></div>
+                                <div class="task-content">
+                                    <div class="task-title">${t.title}</div>
+                                    <div class="task-meta">
+                                        ${t.estimated_minutes ? `${t.estimated_minutes}min` : 'Unknown duration'}
+                                        ${item.note ? ` · ${item.note}` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            if (result.chores.length > 0) {
+                html += `
+                    <div class="section">
+                        <div class="section-header">
+                            <div class="section-title">Chores That Fit</div>
+                        </div>
+                `;
+                result.chores.forEach(c => {
+                    html += `
+                        <div class="card">
+                            <div class="chore">
+                                <div class="chore-info">
+                                    <div class="chore-name">${c.name}</div>
+                                    <div class="chore-meta">${c.duration_minutes}min</div>
+                                </div>
+                                <button class="quick-btn" style="flex: none; padding: 8px 16px;" onclick="completeChore('${c.id}')">Done</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            if (result.tasks.length === 0 && result.chores.length === 0) {
+                html += `
+                    <div class="empty">
+                        <div class="empty-icon">✨</div>
+                        <div>Nothing urgent fits this time slot!</div>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = html;
+        }
+
+        // Actions
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            await api('/api/tasks', 'POST', { text });
+            input.value = '';
+            hideModal();
+            showView(currentView);
+        }
+
+        async function completeTask(id) {
+            await api(`/api/tasks/${id}/done`, 'POST');
+            showView(currentView);
+        }
+
+        async function completeChore(id) {
+            await api(`/api/chores/${id}/done`, 'POST');
+            showView(currentView);
+        }
+
+        async function ackReminder(id) {
+            await api(`/api/reminders/${id}/ack`, 'POST');
+            showView(currentView);
+        }
+
+        async function setEnergy(level) {
+            await api('/api/energy', 'POST', { level });
+            currentEnergy = level;
+            updateEnergyBadge();
+            hideModal();
+        }
+
+        function updateEnergyBadge() {
+            const badge = document.getElementById('energyBadge');
+            badge.className = `energy-badge ${currentEnergy}`;
+            const icons = { peak: '⚡', good: '✨', low: '🔋', depleted: '😴' };
+            badge.textContent = `${icons[currentEnergy] || '✨'} ${currentEnergy.charAt(0).toUpperCase() + currentEnergy.slice(1)}`;
+        }
+
+        // Modals
+        function showAddModal() {
+            document.getElementById('addModal').classList.add('active');
+            document.getElementById('taskInput').focus();
+        }
+
+        function showEnergyPicker() {
+            document.getElementById('energyModal').classList.add('active');
+        }
+
+        function showTimeModal() {
+            document.getElementById('timeModal').classList.add('active');
+        }
+
+        function hideModal() {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+        }
+
+        function whatNow(minutes) {
+            renderWhatNow(minutes);
+        }
+
+        // Voice (placeholder)
+        let isRecording = false;
+        function toggleVoice() {
+            const btn = document.getElementById('voiceBtn');
+            isRecording = !isRecording;
+            btn.classList.toggle('recording', isRecording);
+
+            if (isRecording) {
+                // Start recording - would integrate with Web Speech API or Whisper
+                if ('webkitSpeechRecognition' in window) {
+                    const recognition = new webkitSpeechRecognition();
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+                    recognition.lang = 'en-US';
+
+                    recognition.onresult = (event) => {
+                        const text = event.results[0][0].transcript;
+                        document.getElementById('taskInput').value = text;
+                        isRecording = false;
+                        btn.classList.remove('recording');
+                    };
+
+                    recognition.onerror = () => {
+                        isRecording = false;
+                        btn.classList.remove('recording');
+                    };
+
+                    recognition.start();
+                }
+            }
+        }
+
+        // Helpers
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            if (date.toDateString() === today.toDateString()) return 'Today';
+            if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        // Handle Enter key in input
+        document.getElementById('taskInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask();
+        });
+
+        // Close modals on backdrop click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) hideModal();
+            });
+        });
+
+        // Init
+        showView('home');
+    </script>
+</body>
+</html>

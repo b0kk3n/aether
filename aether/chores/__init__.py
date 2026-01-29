@@ -1,5 +1,5 @@
 """Chore scheduling system."""
 
-from .manager import ChoreManager, Chore
+from .manager import HouseManager
 
-__all__ = ["ChoreManager", "Chore"]
+__all__ = ["HouseManager"]

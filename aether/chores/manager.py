@@ -43,14 +43,16 @@ class HouseManager:
 
     # Default rooms
     DEFAULT_ROOMS = [
-        Room(id="living", name="Living Room", icon="🛋️", zone="indoor", color="#B45309", sort_order=1),
-        Room(id="bedroom", name="Bedroom", icon="🛏️", zone="indoor", color="#7C3AED", sort_order=2),
-        Room(id="bathroom", name="Bathroom", icon="🚿", zone="indoor", color="#0891B2", sort_order=3),
-        Room(id="kitchen", name="Kitchen", icon="🍳", zone="indoor", color="#059669", sort_order=4),
-        Room(id="office", name="Office", icon="💻", zone="indoor", color="#4F46E5", sort_order=5),
-        Room(id="hallway", name="Hallway", icon="🚪", zone="indoor", color="#78716C", sort_order=6),
-        Room(id="garage", name="Garage", icon="🚗", zone="garage", color="#57534E", sort_order=7),
-        Room(id="outdoor", name="Outdoor", icon="🌳", zone="outdoor", color="#15803D", sort_order=8),
+        Room(id="living", name="Living", icon="🛋️", zone="indoor", color="#B45309", sort_order=1),
+        Room(id="office", name="Office", icon="💻", zone="indoor", color="#4F46E5", sort_order=2),
+        Room(id="bedroom", name="Bedroom", icon="🛏️", zone="indoor", color="#7C3AED", sort_order=3),
+        Room(id="bathroom", name="Bathroom", icon="🚿", zone="indoor", color="#0891B2", sort_order=4),
+        Room(id="toilet", name="Toilet", icon="🚽", zone="indoor", color="#06B6D4", sort_order=5),
+        Room(id="kitchen", name="Kitchen", icon="🍳", zone="indoor", color="#059669", sort_order=6),
+        Room(id="hallway", name="Hallway", icon="🚪", zone="indoor", color="#78716C", sort_order=7),
+        Room(id="entry", name="Entry", icon="🏠", zone="indoor", color="#A3A3A3", sort_order=8),
+        Room(id="balcony", name="Balcony", icon="🪴", zone="outdoor", color="#15803D", sort_order=9),
+        Room(id="storage", name="Storage", icon="📦", zone="indoor", color="#57534E", sort_order=10),
     ]
 
     def __init__(self, store: Store):
@@ -678,8 +680,13 @@ class HouseManager:
         """Save all chore types."""
         from ..data.models import Memory
         data = json.dumps([t.to_dict() for t in types])
-        memory = Memory(key="house_chore_types", value=data, memory_type="data", context="Chore types")
-        self.store.save_memory(memory)
+        existing = self.store.get_memory("house_chore_types")
+        if existing:
+            existing.value = data
+            self.store.save_memory(existing)
+        else:
+            memory = Memory(key="house_chore_types", value=data, memory_type="data", context="Chore types")
+            self.store.save_memory(memory)
 
     def _load_rooms(self) -> list[Room]:
         """Load rooms from storage."""
@@ -709,8 +716,13 @@ class HouseManager:
         """Save all rooms."""
         from ..data.models import Memory
         data = json.dumps([r.to_dict() for r in rooms])
-        memory = Memory(key="house_rooms", value=data, memory_type="data", context="Rooms")
-        self.store.save_memory(memory)
+        existing = self.store.get_memory("house_rooms")
+        if existing:
+            existing.value = data
+            self.store.save_memory(existing)
+        else:
+            memory = Memory(key="house_rooms", value=data, memory_type="data", context="Rooms")
+            self.store.save_memory(memory)
 
     def _load_chore_instances(self) -> list[ChoreInstance]:
         """Load chore instances from storage."""
@@ -740,8 +752,13 @@ class HouseManager:
         """Save all chore instances."""
         from ..data.models import Memory
         data = json.dumps([i.to_dict() for i in instances])
-        memory = Memory(key="house_chore_instances", value=data, memory_type="data", context="Chore instances")
-        self.store.save_memory(memory)
+        existing = self.store.get_memory("house_chore_instances")
+        if existing:
+            existing.value = data
+            self.store.save_memory(existing)
+        else:
+            memory = Memory(key="house_chore_instances", value=data, memory_type="data", context="Chore instances")
+            self.store.save_memory(memory)
 
     def _load_maintenance_tasks(self) -> list[MaintenanceTask]:
         """Load maintenance tasks from storage."""
@@ -771,8 +788,13 @@ class HouseManager:
         """Save all maintenance tasks."""
         from ..data.models import Memory
         data = json.dumps([t.to_dict() for t in tasks])
-        memory = Memory(key="house_maintenance", value=data, memory_type="data", context="Maintenance tasks")
-        self.store.save_memory(memory)
+        existing = self.store.get_memory("house_maintenance")
+        if existing:
+            existing.value = data
+            self.store.save_memory(existing)
+        else:
+            memory = Memory(key="house_maintenance", value=data, memory_type="data", context="Maintenance tasks")
+            self.store.save_memory(memory)
 
     def _load_projects(self) -> list[HomeProject]:
         """Load projects from storage."""
@@ -802,8 +824,13 @@ class HouseManager:
         """Save all projects."""
         from ..data.models import Memory
         data = json.dumps([p.to_dict() for p in projects])
-        memory = Memory(key="house_projects", value=data, memory_type="data", context="Home projects")
-        self.store.save_memory(memory)
+        existing = self.store.get_memory("house_projects")
+        if existing:
+            existing.value = data
+            self.store.save_memory(existing)
+        else:
+            memory = Memory(key="house_projects", value=data, memory_type="data", context="Home projects")
+            self.store.save_memory(memory)
 
     def _load_checklists(self) -> list[Checklist]:
         """Load checklists from storage."""
@@ -833,5 +860,10 @@ class HouseManager:
         """Save all checklists."""
         from ..data.models import Memory
         data = json.dumps([c.to_dict() for c in checklists])
-        memory = Memory(key="house_checklists", value=data, memory_type="data", context="Checklists")
-        self.store.save_memory(memory)
+        existing = self.store.get_memory("house_checklists")
+        if existing:
+            existing.value = data
+            self.store.save_memory(existing)
+        else:
+            memory = Memory(key="house_checklists", value=data, memory_type="data", context="Checklists")
+            self.store.save_memory(memory)

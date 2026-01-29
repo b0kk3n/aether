@@ -271,6 +271,7 @@ class HouseManager:
                     "instance": instance,
                     "chore_type": chore_type,
                     "room": room,
+                    "is_due": True,
                     "urgency_score": instance.urgency_score(chore_type),
                     "days_until_due": instance.days_until_due(chore_type),
                     "freshness": instance.freshness_percent(chore_type),

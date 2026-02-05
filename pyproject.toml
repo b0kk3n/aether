@@ -1,7 +1,7 @@
 [project]
 name = "aether"
-version = "0.2.0"
-description = "Personal command center - one interface for everything that needs doing"
+version = "0.3.0"
+description = "Home Concierge - Your home, managed. Your mind, free."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

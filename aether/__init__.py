@@ -1,6 +1,45 @@
-"""Aether - Personal command center."""
+"""Aether - Home Concierge.
 
-from .core.engine import Aether
+Your home, managed. Your mind, free.
+"""
 
-__version__ = "0.2.0"
-__all__ = ["Aether"]
+__version__ = "0.3.0"
+
+from .core import (
+    # Models
+    Room,
+    Chore,
+    ChoreStatus,
+    Checklist,
+    Dashboard,
+    Briefing,
+    Priority,
+    Category,
+    # Services
+    RoomService,
+    ChoreService,
+    ChecklistService,
+    Prioritizer,
+    # Database
+    init_db,
+)
+
+__all__ = [
+    "__version__",
+    # Models
+    "Room",
+    "Chore",
+    "ChoreStatus",
+    "Checklist",
+    "Dashboard",
+    "Briefing",
+    "Priority",
+    "Category",
+    # Services
+    "RoomService",
+    "ChoreService",
+    "ChecklistService",
+    "Prioritizer",
+    # Database
+    "init_db",
+]

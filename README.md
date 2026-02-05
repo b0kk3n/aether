@@ -1,78 +1,94 @@
 # Aether
 
-**House Manager** — Keep your home running smoothly without the mental load.
+> **Home Concierge** — Your home, managed. Your mind, free.
+
+Aether lifts the mental burden of remembering what needs to be done around your home, when, and how urgently. It's not a personal assistant or task manager — it's a knowledgeable concierge who knows the state of your home and advises when asked.
 
 ## Philosophy
 
-Your home shouldn't require a second job to maintain. Aether tracks what needs doing, when, and helps you tackle it in a way that works with ADHD — not against it.
+- **Offload, don't add** — Reduces mental load, never creates more
+- **Flexible, not strict** — Life happens. Soft deadlines, no nagging
+- **Adaptive** — Learns your patterns, asks before adjusting intervals
+- **Room-first thinking** — Matches how you experience your home
+- **Classy gamification** — Satisfying completions, not cartoon rewards
 
-## Core Features
+## Features
 
-### 🧹 Chores
-Regular cleaning tasks organized by **type** and **room**.
+### Core
+- **77 chores** organized by room with smart intervals
+- **Freshness scores** — See room status at a glance
+- **"I have X minutes"** — Get prioritized tasks that fit your time
+- **Morning briefing** — ~15 min of high-impact suggestions
+- **Checklists** — Scenarios like "Parents visiting" or "Sleepover"
 
-- **Filter by chore**: "I want to vacuum today" → see all rooms that need vacuuming
-- **Filter by room**: "Let me tackle the bathroom" → see all chores for that room
-- **Per-room settings**: Vacuum the living room weekly (20min), bedroom bi-weekly (10min)
-- **Smart urgency**: Overdue tasks bubble up, but nothing nags
-
-### 🔧 Home Maintenance
-Periodic tasks that keep your home healthy.
-
-- Oil hardwood floors (yearly)
-- Change HVAC filter (monthly)
-- Schedule boiler service (yearly)
-- Clean dryer vent (6 months)
-
-### 🏗️ Home Projects
-Larger improvements broken into steps.
-
-- Renovate kitchen
-- Fix bathroom tiles
-- Install smart thermostat
-
-### 📋 Checklists
-Pre-defined scenarios for when life happens.
-
-- **Sleepover**: Fresh sheets, clean bathroom, tidy bedroom
-- **Guests visiting**: Vacuum main areas, clean toilet, declutter living room
-- **Quick tidy**: The essentials when you have 15 minutes
-
-## Data Model
-
-```
-ChoreType (vacuum, mop, dust, declutter...)
-    │
-    └── ChoreInstance (chore + room combination)
-            ├── room: living_room
-            ├── duration: 20min (per-room)
-            ├── interval: 7 days (per-room)
-            ├── last_completed
-            └── streak
-```
+### Smart
+- **Priority auto-calculation** — Based on interval frequency
+- **Streak tracking** — Gamified consistency
+- **Duration estimation** — Learns accurate times from your feedback
+- **Overdue tracking** — Nothing nags, but you can see what needs attention
 
 ## Quick Start
 
 ```bash
+# Install
 pip install -e .
+
+# Seed with initial data
+aether seed
+
+# Start the server
 aether serve
+
 # Open http://localhost:8080 on your phone
 ```
 
-## Design
+## CLI Commands
 
-Mediterranean-inspired palette:
-- Warm terracotta accents
-- Sandy/cream backgrounds
-- Olive and sage greens
-- Ocean blue highlights
-- Warm, inviting feel
+```bash
+aether dashboard    # Home overview
+aether briefing     # Morning briefing
+aether quick 30     # "I have 30 minutes"
+aether rooms        # List all rooms
+aether overdue      # List overdue chores
+aether done <id>    # Mark chore complete
+aether checklists   # List checklists
+aether checklist <id>  # View checklist
+```
 
-ADHD-friendly:
-- Gamification (streaks, scores)
-- Satisfying interactions
-- Visual progress
-- No overwhelming lists
+## API
+
+All endpoints available at `/api`:
+
+- `GET /api/dashboard` — Home overview
+- `GET /api/dashboard/briefing` — Morning briefing
+- `GET /api/dashboard/quick-clean?minutes=30` — Prioritized list
+- `GET /api/rooms` — List rooms with freshness
+- `GET /api/rooms/{id}/chores` — Chores for a room
+- `GET /api/chores` — List all chores
+- `POST /api/chores/{id}/complete` — Mark complete
+- `GET /api/checklists` — List checklists
+- `GET /api/checklists/{id}` — Checklist with live status
+
+## Tech Stack
+
+- **Backend**: Python 3.11+ / FastAPI
+- **Database**: SQLite
+- **Frontend**: PWA (Progressive Web App)
+- **CLI**: Click + Rich
+
+## Project Structure
+
+```
+aether/
+├── api/           # FastAPI routes
+├── core/
+│   ├── models.py    # Data models
+│   ├── database.py  # SQLite setup
+│   └── services/    # Business logic
+├── seed/          # Initial data
+├── web/           # PWA frontend
+└── cli.py         # Command-line interface
+```
 
 ## License
 

@@ -433,7 +433,10 @@ class ChoreService:
 
         Returns True if:
         - Duration is not yet confirmed
-        - We haven't asked too many times recently
+        - This will be an odd-numbered completion (1st, 3rd, 5th, etc.)
+
+        Note: Called BEFORE completion, so we check if current count is even
+        (0, 2, 4...) which becomes odd (1, 3, 5...) after completing.
         """
         chore = ChoreService.get_by_id(chore_id)
         if not chore:
@@ -442,5 +445,5 @@ class ChoreService:
         if chore.duration_confirmed:
             return False
 
-        # Ask every other time until confirmed
-        return chore.completion_count % 2 == 1
+        # Ask on 1st, 3rd, 5th completions (when current count is 0, 2, 4...)
+        return chore.completion_count % 2 == 0

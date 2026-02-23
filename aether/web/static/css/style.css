@@ -136,6 +136,7 @@ body {
   position: relative;
   overflow: hidden;
   touch-action: pan-y;
+  -webkit-user-select: none;
   user-select: none;
 }
 

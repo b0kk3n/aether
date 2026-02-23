@@ -444,3 +444,26 @@ class ChoreService:
 
         # Ask every other time until confirmed
         return chore.completion_count % 2 == 1
+
+    @staticmethod
+    def record_duration_feedback(chore_id: str, was_accurate: bool) -> Optional[Chore]:
+        """Record user feedback on duration estimate accuracy."""
+        chore = ChoreService.get_by_id(chore_id)
+        if not chore or chore.duration_confirmed:
+            return chore
+
+        duration_confirmations = chore.duration_confirmations
+        duration_confirmed = chore.duration_confirmed
+
+        if was_accurate:
+            duration_confirmations += 1
+            if duration_confirmations >= 2:
+                duration_confirmed = True
+
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE chores SET duration_confirmed = ?, duration_confirmations = ? WHERE id = ?",
+                (1 if duration_confirmed else 0, duration_confirmations, chore_id),
+            )
+
+        return ChoreService.get_by_id(chore_id)

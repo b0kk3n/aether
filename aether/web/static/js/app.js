@@ -515,7 +515,7 @@ function initSwipeGestures() {
 // Complete Chore
 async function completeChore(choreId) {
   try {
-    await api(`/chores/${choreId}/complete`, { method: 'POST' });
+    const result = await api(`/chores/${choreId}/complete`, { method: 'POST' });
 
     // Refresh current view
     if (currentView === 'home') {
@@ -524,6 +524,13 @@ async function completeChore(choreId) {
       loadRoomDetail(currentRoomId);
     } else if (currentView === 'lists' && currentChecklistId) {
       loadChecklistDetail(currentChecklistId);
+    }
+
+    // Show duration confirmation if needed
+    if (result && result.ask_about_duration) {
+      setTimeout(() => {
+        showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes);
+      }, 400);
     }
   } catch (err) {
     console.error('Failed to complete chore:', err);
@@ -566,6 +573,11 @@ async function completeChoreWithAnimation(container, choreId) {
           loadHomeView();
         }
       }
+
+      // Show duration confirmation if needed
+      if (result.ask_about_duration) {
+        showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes);
+      }
     }, 400);
 
   } catch (err) {
@@ -573,6 +585,71 @@ async function completeChoreWithAnimation(container, choreId) {
     container.classList.remove('card-completing');
     content.style.transform = 'translateX(0)';
   }
+}
+
+// Duration Confirmation Modal
+function showDurationConfirmation(choreId, choreName, estimatedMinutes) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'duration-modal-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+  sheet.id = 'duration-modal-sheet';
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Was that about right?</div>
+    <div class="modal-subtitle">${choreName} is estimated at ${estimatedMinutes} min.</div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-primary" onclick="confirmDuration('${choreId}', true)">
+        Yes, that's accurate
+      </button>
+      <button class="modal-btn modal-btn-secondary" onclick="confirmDuration('${choreId}', false)">
+        No, it takes different time
+      </button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissDurationModal()">
+        Skip
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+
+  // Dismiss on overlay tap
+  overlay.addEventListener('click', dismissDurationModal);
+
+  // Animate in
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+  });
+}
+
+async function confirmDuration(choreId, accurate) {
+  dismissDurationModal();
+  try {
+    await api(`/chores/${choreId}/duration-feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ accurate }),
+    });
+  } catch (err) {
+    console.error('Failed to record duration feedback:', err);
+  }
+}
+
+function dismissDurationModal() {
+  const overlay = document.getElementById('duration-modal-overlay');
+  const sheet = document.getElementById('duration-modal-sheet');
+  if (!overlay) return;
+
+  overlay.classList.remove('visible');
+  sheet.classList.remove('visible');
+
+  setTimeout(() => {
+    overlay.remove();
+    sheet.remove();
+  }, 300);
 }
 
 // Expose functions globally
@@ -583,3 +660,5 @@ window.loadRoomDetail = loadRoomDetail;
 window.loadChecklistDetail = loadChecklistDetail;
 window.loadQuickClean = loadQuickClean;
 window.completeChore = completeChore;
+window.confirmDuration = confirmDuration;
+window.dismissDurationModal = dismissDurationModal;

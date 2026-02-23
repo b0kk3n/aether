@@ -25,6 +25,11 @@ class CompleteRequest(BaseModel):
     duration_was_accurate: Optional[bool] = None
 
 
+class DurationFeedbackRequest(BaseModel):
+    """Request body for duration feedback."""
+    accurate: bool
+
+
 class CompleteResponse(BaseModel):
     """Response for chore completion."""
     chore: Chore
@@ -141,6 +146,15 @@ def complete_chore(chore_id: str, request: CompleteRequest = CompleteRequest()):
         ask_about_duration=ask_about_duration and request.duration_was_accurate is None,
         message=message,
     )
+
+
+@router.post("/{chore_id}/duration-feedback", status_code=204)
+def record_duration_feedback(chore_id: str, request: DurationFeedbackRequest):
+    """Record user feedback on whether the duration estimate was accurate."""
+    chore = ChoreService.get_by_id(chore_id)
+    if not chore:
+        raise HTTPException(status_code=404, detail="Chore not found")
+    ChoreService.record_duration_feedback(chore_id, request.accurate)
 
 
 @router.delete("/{chore_id}", status_code=204)

@@ -42,6 +42,12 @@ class Prioritizer:
                 FROM chores c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
+                AND (
+                    -- Never done = always show
+                    c.last_completed_at IS NULL
+                    -- Overdue or due within 3 days
+                    OR julianday('now') - julianday(c.last_completed_at) >= c.interval_days - 3
+                )
                 ORDER BY
                     -- Never done = highest priority
                     CASE WHEN c.last_completed_at IS NULL THEN 0 ELSE 1 END,
@@ -49,6 +55,8 @@ class Prioritizer:
                     CASE WHEN c.last_completed_at IS NULL THEN -999
                          ELSE julianday(c.last_completed_at) + c.interval_days - julianday('now')
                     END,
+                    -- House-wide tasks before room-specific at same urgency
+                    CASE WHEN c.room_id IS NULL THEN 0 ELSE 1 END,
                     -- Then by interval (shorter = higher priority)
                     c.interval_days
                 """

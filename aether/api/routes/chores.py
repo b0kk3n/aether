@@ -28,12 +28,20 @@ class CompleteRequest(BaseModel):
 class DurationFeedbackRequest(BaseModel):
     """Request body for duration feedback."""
     accurate: bool
+    actual_minutes: Optional[int] = None
+
+
+class IntervalFeedbackRequest(BaseModel):
+    """Request body for interval feedback."""
+    accurate: bool
+    actual_days: Optional[int] = None
 
 
 class CompleteResponse(BaseModel):
     """Response for chore completion."""
     chore: Chore
     ask_about_duration: bool
+    ask_about_interval: bool
     message: str
 
 
@@ -124,8 +132,9 @@ def complete_chore(chore_id: str, request: CompleteRequest = CompleteRequest()):
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
 
-    # Check if we should ask about duration before completing
+    # Check if we should ask about duration/interval before completing
     ask_about_duration = ChoreService.should_ask_duration(chore_id)
+    ask_about_interval = ChoreService.should_ask_interval(chore_id)
 
     # Complete the chore
     updated_chore = ChoreService.complete(
@@ -144,8 +153,18 @@ def complete_chore(chore_id: str, request: CompleteRequest = CompleteRequest()):
     return CompleteResponse(
         chore=updated_chore,
         ask_about_duration=ask_about_duration and request.duration_was_accurate is None,
+        ask_about_interval=ask_about_interval,
         message=message,
     )
+
+
+@router.post("/{chore_id}/interval-feedback", status_code=204)
+def record_interval_feedback(chore_id: str, request: IntervalFeedbackRequest):
+    """Record user feedback on whether the interval schedule was accurate."""
+    chore = ChoreService.get_by_id(chore_id)
+    if not chore:
+        raise HTTPException(status_code=404, detail="Chore not found")
+    ChoreService.record_interval_feedback(chore_id, request.accurate, request.actual_days)
 
 
 @router.post("/{chore_id}/duration-feedback", status_code=204)
@@ -154,7 +173,7 @@ def record_duration_feedback(chore_id: str, request: DurationFeedbackRequest):
     chore = ChoreService.get_by_id(chore_id)
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
-    ChoreService.record_duration_feedback(chore_id, request.accurate)
+    ChoreService.record_duration_feedback(chore_id, request.accurate, request.actual_minutes)
 
 
 @router.delete("/{chore_id}", status_code=204)

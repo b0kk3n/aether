@@ -543,10 +543,14 @@ async function completeChore(choreId) {
       loadChecklistDetail(currentChecklistId);
     }
 
-    // Show duration confirmation if needed
+    // Show at most one confirmation modal per completion (duration takes priority)
     if (result && result.ask_about_duration) {
       setTimeout(() => {
         showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes);
+      }, 400);
+    } else if (result && result.ask_about_interval) {
+      setTimeout(() => {
+        showIntervalConfirmation(choreId, result.chore.name, result.chore.interval_days);
       }, 400);
     }
   } catch (err) {
@@ -591,9 +595,11 @@ async function completeChoreWithAnimation(container, choreId) {
         }
       }
 
-      // Show duration confirmation if needed
+      // Show at most one confirmation modal per completion (duration takes priority)
       if (result.ask_about_duration) {
         showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes);
+      } else if (result.ask_about_interval) {
+        showIntervalConfirmation(choreId, result.chore.name, result.chore.interval_days);
       }
     }, 400);
 
@@ -621,7 +627,7 @@ function showDurationConfirmation(choreId, choreName, estimatedMinutes) {
       <button class="modal-btn modal-btn-primary" onclick="confirmDuration('${choreId}', true)">
         Yes, that's accurate
       </button>
-      <button class="modal-btn modal-btn-secondary" onclick="confirmDuration('${choreId}', false)">
+      <button class="modal-btn modal-btn-secondary" onclick="showDurationAdjust('${choreId}', ${estimatedMinutes})">
         No, it takes different time
       </button>
       <button class="modal-btn modal-btn-tertiary" onclick="dismissDurationModal()">
@@ -643,12 +649,66 @@ function showDurationConfirmation(choreId, choreName, estimatedMinutes) {
   });
 }
 
-async function confirmDuration(choreId, accurate) {
+function showDurationAdjust(choreId, estimatedMinutes) {
+  const sheet = document.getElementById('duration-modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">How long does it take?</div>
+    <div class="modal-subtitle">Enter the actual time in minutes.</div>
+    <div class="duration-input-group">
+      <button class="duration-btn" onclick="stepDuration(-5)">−</button>
+      <input
+        type="number"
+        id="duration-input"
+        class="duration-input"
+        value="${estimatedMinutes}"
+        min="1"
+        inputmode="numeric"
+      />
+      <button class="duration-btn" onclick="stepDuration(5)">+</button>
+    </div>
+    <div class="modal-buttons" style="margin-top: var(--space-lg)">
+      <button class="modal-btn modal-btn-primary" onclick="submitDurationAdjust('${choreId}')">
+        Save
+      </button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissDurationModal()">
+        Cancel
+      </button>
+    </div>
+  `;
+
+  // Focus input after render
+  requestAnimationFrame(() => {
+    const input = document.getElementById('duration-input');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  });
+}
+
+function stepDuration(delta) {
+  const input = document.getElementById('duration-input');
+  if (!input) return;
+  const current = parseInt(input.value, 10) || 0;
+  input.value = Math.max(1, current + delta);
+}
+
+async function submitDurationAdjust(choreId) {
+  const input = document.getElementById('duration-input');
+  const actualMinutes = input ? parseInt(input.value, 10) : null;
+  if (!actualMinutes || actualMinutes < 1) return;
+  await confirmDuration(choreId, false, actualMinutes);
+}
+
+async function confirmDuration(choreId, accurate, actualMinutes = null) {
   dismissDurationModal();
   try {
+    const body = { accurate };
+    if (actualMinutes) body.actual_minutes = actualMinutes;
     await api(`/chores/${choreId}/duration-feedback`, {
       method: 'POST',
-      body: JSON.stringify({ accurate }),
+      body: JSON.stringify(body),
     });
   } catch (err) {
     console.error('Failed to record duration feedback:', err);
@@ -658,6 +718,138 @@ async function confirmDuration(choreId, accurate) {
 function dismissDurationModal() {
   const overlay = document.getElementById('duration-modal-overlay');
   const sheet = document.getElementById('duration-modal-sheet');
+  if (!overlay) return;
+
+  overlay.classList.remove('visible');
+  sheet.classList.remove('visible');
+
+  setTimeout(() => {
+    overlay.remove();
+    sheet.remove();
+  }, 300);
+}
+
+// Interval Confirmation Modal
+function formatInterval(days) {
+  if (days === 1) return 'every day';
+  if (days === 7) return 'every week';
+  if (days === 14) return 'every 2 weeks';
+  if (days === 30) return 'every month';
+  if (days % 7 === 0) return `every ${days / 7} weeks`;
+  return `every ${days} days`;
+}
+
+function showIntervalConfirmation(choreId, choreName, intervalDays) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'interval-modal-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+  sheet.id = 'interval-modal-sheet';
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Right schedule?</div>
+    <div class="modal-subtitle">${choreName} is set to ${formatInterval(intervalDays)}.</div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-primary" onclick="confirmInterval('${choreId}', true)">
+        Yes, that's right
+      </button>
+      <button class="modal-btn modal-btn-secondary" onclick="showIntervalAdjust('${choreId}', ${intervalDays})">
+        No, change the schedule
+      </button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissIntervalModal()">
+        Skip
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+
+  overlay.addEventListener('click', dismissIntervalModal);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+  });
+}
+
+function showIntervalAdjust(choreId, intervalDays) {
+  const sheet = document.getElementById('interval-modal-sheet');
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">How often?</div>
+    <div class="modal-subtitle">Enter the number of days between completions.</div>
+    <div class="duration-input-group">
+      <button class="duration-btn" onclick="stepInterval(-1)">−</button>
+      <input
+        type="number"
+        id="interval-input"
+        class="duration-input"
+        value="${intervalDays}"
+        min="1"
+        inputmode="numeric"
+      />
+      <button class="duration-btn" onclick="stepInterval(1)">+</button>
+    </div>
+    <div class="modal-subtitle" id="interval-preview" style="margin-top: var(--space-sm); margin-bottom: 0; text-align: center;">
+      ${formatInterval(intervalDays)}
+    </div>
+    <div class="modal-buttons" style="margin-top: var(--space-lg)">
+      <button class="modal-btn modal-btn-primary" onclick="submitIntervalAdjust('${choreId}')">
+        Save
+      </button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissIntervalModal()">
+        Cancel
+      </button>
+    </div>
+  `;
+
+  const input = document.getElementById('interval-input');
+  input.addEventListener('input', () => {
+    const days = parseInt(input.value, 10);
+    const preview = document.getElementById('interval-preview');
+    if (preview && days > 0) preview.textContent = formatInterval(days);
+  });
+
+  requestAnimationFrame(() => {
+    if (input) { input.focus(); input.select(); }
+  });
+}
+
+function stepInterval(delta) {
+  const input = document.getElementById('interval-input');
+  if (!input) return;
+  const current = parseInt(input.value, 10) || 0;
+  input.value = Math.max(1, current + delta);
+  input.dispatchEvent(new Event('input'));
+}
+
+async function submitIntervalAdjust(choreId) {
+  const input = document.getElementById('interval-input');
+  const actualDays = input ? parseInt(input.value, 10) : null;
+  if (!actualDays || actualDays < 1) return;
+  await confirmInterval(choreId, false, actualDays);
+}
+
+async function confirmInterval(choreId, accurate, actualDays = null) {
+  dismissIntervalModal();
+  try {
+    const body = { accurate };
+    if (actualDays) body.actual_days = actualDays;
+    await api(`/chores/${choreId}/interval-feedback`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    console.error('Failed to record interval feedback:', err);
+  }
+}
+
+function dismissIntervalModal() {
+  const overlay = document.getElementById('interval-modal-overlay');
+  const sheet = document.getElementById('interval-modal-sheet');
   if (!overlay) return;
 
   overlay.classList.remove('visible');
@@ -679,3 +871,12 @@ window.loadQuickClean = loadQuickClean;
 window.completeChore = completeChore;
 window.confirmDuration = confirmDuration;
 window.dismissDurationModal = dismissDurationModal;
+window.showDurationAdjust = showDurationAdjust;
+window.stepDuration = stepDuration;
+window.submitDurationAdjust = submitDurationAdjust;
+window.showIntervalConfirmation = showIntervalConfirmation;
+window.showIntervalAdjust = showIntervalAdjust;
+window.stepInterval = stepInterval;
+window.submitIntervalAdjust = submitIntervalAdjust;
+window.confirmInterval = confirmInterval;
+window.dismissIntervalModal = dismissIntervalModal;

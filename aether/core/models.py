@@ -135,6 +135,10 @@ class Chore(ChoreBase):
     duration_confirmed: bool = False
     duration_confirmations: int = 0
 
+    # Interval tracking
+    interval_confirmed: bool = False
+    interval_confirmations: int = 0
+
     created_at: datetime = Field(default_factory=datetime.now)
 
     class Config:

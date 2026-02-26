@@ -202,6 +202,8 @@ function renderChoreCard(chore) {
               <span>${chore.room_name || 'House-wide'}</span>
               <span>·</span>
               <span>${chore.estimated_minutes} min</span>
+              <span>·</span>
+              <span>${formatDueDate(chore.days_until_due)}</span>
             </div>
           </div>
           <div class="chore-status ${statusClass}"></div>
@@ -239,7 +241,18 @@ function renderQuickClean(result, minutes) {
 
     ${result.chores.length > 0 ? `
       <div id="chore-list">
-        ${result.chores.map(chore => renderChoreCard(chore)).join('')}
+        ${(() => {
+          const grouped = {};
+          result.chores.forEach(chore => {
+            const cat = chore.category || 'other';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(chore);
+          });
+          return Object.entries(grouped).map(([cat, chores]) => `
+            ${chores.length > 1 ? `<div class="section-header"><span class="section-title">${cat}</span></div>` : ''}
+            ${chores.map(c => renderChoreCard(c)).join('')}
+          `).join('');
+        })()}
       </div>
 
       <div class="caption mt-lg">
@@ -436,7 +449,11 @@ function renderChecklistDetail(checklist) {
     </div>
 
     <div id="checklist-items">
-      ${checklist.chores.map(chore => {
+      ${[...checklist.chores].sort((a, b) => {
+        const aDone = !a.is_overdue && a.days_until_due > 0;
+        const bDone = !b.is_overdue && b.days_until_due > 0;
+        return aDone === bDone ? 0 : aDone ? 1 : -1;
+      }).map(chore => {
         const isDone = !chore.is_overdue && chore.days_until_due > 0;
         return `
           <div class="checklist-item ${isDone ? 'done' : ''}" data-chore-id="${chore.id}">

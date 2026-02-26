@@ -167,6 +167,8 @@ class Chore(ChoreBase):
         """How fresh is this chore (100 = just done, 0 = due/overdue).
 
         Calculated as percentage of interval remaining.
+        Overdue chores score 0%. Chores due within 3 days score at least 50%
+        to avoid an overly negative view when nothing urgent needs doing.
         """
         if not self.last_completed_at:
             return 0
@@ -178,7 +180,11 @@ class Chore(ChoreBase):
         elif days_since >= self.interval_days:
             return 0
         else:
-            return int(100 - (days_since / self.interval_days * 100))
+            actual = int(100 - (days_since / self.interval_days * 100))
+            days_until = self.interval_days - days_since
+            if days_until <= 3:
+                return max(actual, 50)
+            return actual
 
     @property
     def urgency_score(self) -> float:

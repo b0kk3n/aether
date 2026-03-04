@@ -28,37 +28,46 @@ def seed_chores(room_ids: dict[str, str]) -> dict[tuple[str, str], str]:
     # Room-specific chores
     for room_name, chores in CHORES_BY_ROOM.items():
         room_id = room_ids.get(room_name)
-        for name, interval, minutes, category in chores:
+        for chore_data in chores:
+            name, interval, minutes, category = chore_data[:4]
+            notes = chore_data[4] if len(chore_data) > 4 else ""
             chore = ChoreService.create(ChoreCreate(
                 name=name,
                 room_id=room_id,
                 interval_days=interval,
                 estimated_minutes=minutes,
                 category=category,
+                notes=notes,
             ))
             chore_ids[(room_name, name)] = chore.id
         print(f"  Created {len(chores)} chores for {room_name}")
 
     # House-wide chores
-    for name, interval, minutes, category in HOUSE_WIDE_CHORES:
+    for chore_data in HOUSE_WIDE_CHORES:
+        name, interval, minutes, category = chore_data[:4]
+        notes = chore_data[4] if len(chore_data) > 4 else ""
         chore = ChoreService.create(ChoreCreate(
             name=name,
             room_id=None,
             interval_days=interval,
             estimated_minutes=minutes,
             category=category,
+            notes=notes,
         ))
         chore_ids[(None, name)] = chore.id
     print(f"  Created {len(HOUSE_WIDE_CHORES)} house-wide chores")
 
     # Maintenance chores
-    for name, interval, minutes, category in MAINTENANCE_CHORES:
+    for chore_data in MAINTENANCE_CHORES:
+        name, interval, minutes, category = chore_data[:4]
+        notes = chore_data[4] if len(chore_data) > 4 else ""
         chore = ChoreService.create(ChoreCreate(
             name=name,
             room_id=None,
             interval_days=interval,
             estimated_minutes=minutes,
             category=category,
+            notes=notes,
         ))
         chore_ids[(None, name)] = chore.id
     print(f"  Created {len(MAINTENANCE_CHORES)} maintenance chores")

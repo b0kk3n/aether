@@ -15,6 +15,7 @@ Aether lifts the mental burden of remembering what needs to be done around your 
 ## Features
 
 ### Core
+
 - **77 chores** organized by room with smart intervals
 - **Freshness scores** — See room status at a glance
 - **"I have X minutes"** — Get prioritized tasks that fit your time
@@ -22,6 +23,7 @@ Aether lifts the mental burden of remembering what needs to be done around your 
 - **Checklists** — Scenarios like "Parents visiting" or "Sleepover"
 
 ### Smart
+
 - **Priority auto-calculation** — Based on interval frequency
 - **Streak tracking** — Gamified consistency
 - **Duration estimation** — Learns accurate times from your feedback
@@ -78,7 +80,7 @@ All endpoints available at `/api`:
 
 ## Project Structure
 
-```
+```text
 aether/
 ├── api/           # FastAPI routes
 ├── core/

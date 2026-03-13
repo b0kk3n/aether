@@ -206,7 +206,14 @@ function renderChoreCard(chore) {
               <span>${formatDueDate(chore.days_until_due)}</span>
             </div>
           </div>
-          <div class="chore-status ${statusClass}"></div>
+          <div class="chore-card-actions">
+            <button class="chore-edit-btn" onclick="openChoreEditor('${chore.id}'); event.stopPropagation();" ontouchstart="event.stopPropagation();" title="Edit chore">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+              </svg>
+            </button>
+            <div class="chore-status ${statusClass}"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -328,12 +335,20 @@ function renderRoomDetail(room, chores) {
   const allGood = chores.filter(c => !c.is_overdue && c.days_until_due > 3);
 
   const html = `
-    <a href="#" class="back-btn" onclick="loadRoomsView(); return false;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"></polyline>
-      </svg>
-      ${room.name}
-    </a>
+    <div class="view-header">
+      <a href="#" class="back-btn" onclick="loadRoomsView(); return false;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        ${room.name}
+      </a>
+      <button class="icon-btn" onclick="openChoreCreator('${room.id}')" title="Add chore">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+    </div>
 
     <div class="room-progress" style="height: 8px; margin-bottom: var(--space-sm);">
       <div class="room-progress-bar ${getProgressClass(room.freshness_percent)}"
@@ -861,6 +876,218 @@ function dismissIntervalModal() {
   }, 300);
 }
 
+// Chore Management (Create / Edit / Delete)
+
+async function openChoreEditor(choreId) {
+  try {
+    const [chore, rooms] = await Promise.all([
+      api(`/chores/${choreId}`),
+      api('/rooms'),
+    ]);
+    showChoreForm(chore, rooms);
+  } catch (err) {
+    console.error('Failed to load chore for editing:', err);
+  }
+}
+
+async function openChoreCreator(roomId = null) {
+  try {
+    const rooms = await api('/rooms');
+    showChoreForm(null, rooms, roomId);
+  } catch (err) {
+    console.error('Failed to load rooms:', err);
+  }
+}
+
+function showChoreForm(chore, rooms, defaultRoomId = null) {
+  const isEdit = !!chore;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'chore-form-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet chore-form-sheet';
+  sheet.id = 'chore-form-sheet';
+
+  const categories = ['vacuum', 'mop', 'dust', 'declutter', 'clean', 'wash', 'wipe', 'maintain'];
+  const selectedRoom = chore ? chore.room_id : defaultRoomId;
+  const roomOptions = rooms.map(r =>
+    `<option value="${r.id}" ${selectedRoom === r.id ? 'selected' : ''}>${r.icon} ${r.name}</option>`
+  ).join('');
+
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">${isEdit ? 'Edit chore' : 'New chore'}</div>
+
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input type="text" id="chore-form-name" class="form-input"
+        value="${chore ? chore.name.replace(/"/g, '&quot;') : ''}"
+        placeholder="e.g. Vacuum living room"
+        autocomplete="off" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Room</label>
+      <select id="chore-form-room" class="form-select">
+        <option value="" ${!selectedRoom ? 'selected' : ''}>House-wide</option>
+        ${roomOptions}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select id="chore-form-category" class="form-select">
+        ${categories.map(c =>
+          `<option value="${c}" ${(chore ? chore.category : 'clean') === c ? 'selected' : ''}>${c.charAt(0).toUpperCase() + c.slice(1)}</option>`
+        ).join('')}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Repeat every</label>
+      <div class="duration-input-group">
+        <button class="duration-btn" onclick="stepFormValue('chore-form-interval', -1)">−</button>
+        <input type="number" id="chore-form-interval" class="duration-input"
+          value="${chore ? chore.interval_days : 7}" min="1" inputmode="numeric" />
+        <button class="duration-btn" onclick="stepFormValue('chore-form-interval', 1)">+</button>
+      </div>
+      <div class="form-hint">days</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Takes about</label>
+      <div class="duration-input-group">
+        <button class="duration-btn" onclick="stepFormValue('chore-form-duration', -5)">−</button>
+        <input type="number" id="chore-form-duration" class="duration-input"
+          value="${chore ? chore.estimated_minutes : 15}" min="1" inputmode="numeric" />
+        <button class="duration-btn" onclick="stepFormValue('chore-form-duration', 5)">+</button>
+      </div>
+      <div class="form-hint">minutes</div>
+    </div>
+
+    <div class="modal-buttons" style="margin-top: var(--space-lg);">
+      <button class="modal-btn modal-btn-primary" onclick="submitChoreForm('${chore ? chore.id : ''}', ${isEdit})">
+        ${isEdit ? 'Save changes' : 'Add chore'}
+      </button>
+      ${isEdit ? `
+        <button class="modal-btn modal-btn-secondary chore-delete-btn" onclick="confirmDeleteChore('${chore.id}', ${JSON.stringify(chore.name)})">
+          Delete chore
+        </button>
+      ` : ''}
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissChoreForm()">
+        Cancel
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+  overlay.addEventListener('click', dismissChoreForm);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+    if (!isEdit) {
+      const nameInput = document.getElementById('chore-form-name');
+      if (nameInput) nameInput.focus();
+    }
+  });
+}
+
+function stepFormValue(inputId, delta) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const current = parseInt(input.value, 10) || 0;
+  input.value = Math.max(1, current + delta);
+}
+
+async function submitChoreForm(choreId, isEdit) {
+  const name = document.getElementById('chore-form-name')?.value?.trim();
+  const roomId = document.getElementById('chore-form-room')?.value || null;
+  const category = document.getElementById('chore-form-category')?.value;
+  const intervalDays = parseInt(document.getElementById('chore-form-interval')?.value, 10);
+  const estimatedMinutes = parseInt(document.getElementById('chore-form-duration')?.value, 10);
+
+  if (!name) {
+    const nameInput = document.getElementById('chore-form-name');
+    if (nameInput) { nameInput.focus(); nameInput.style.borderColor = 'var(--overdue)'; }
+    return;
+  }
+
+  const body = {
+    name,
+    room_id: roomId || null,
+    category,
+    interval_days: intervalDays,
+    estimated_minutes: estimatedMinutes,
+  };
+
+  try {
+    if (isEdit) {
+      await api(`/chores/${choreId}`, { method: 'PUT', body: JSON.stringify(body) });
+    } else {
+      await api('/chores', { method: 'POST', body: JSON.stringify(body) });
+    }
+    dismissChoreForm();
+    refreshCurrentView();
+  } catch (err) {
+    console.error('Failed to save chore:', err);
+  }
+}
+
+function confirmDeleteChore(choreId, choreName) {
+  const sheet = document.getElementById('chore-form-sheet');
+  if (!sheet) return;
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Delete chore?</div>
+    <div class="modal-subtitle">"${choreName}" and its completion history will be removed permanently.</div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-primary chore-delete-btn" onclick="deleteChore('${choreId}')">
+        Yes, delete
+      </button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissChoreForm()">
+        Cancel
+      </button>
+    </div>
+  `;
+}
+
+async function deleteChore(choreId) {
+  try {
+    await api(`/chores/${choreId}`, { method: 'DELETE' });
+    dismissChoreForm();
+    refreshCurrentView();
+  } catch (err) {
+    console.error('Failed to delete chore:', err);
+    dismissChoreForm();
+  }
+}
+
+function dismissChoreForm() {
+  const overlay = document.getElementById('chore-form-overlay');
+  const sheet = document.getElementById('chore-form-sheet');
+  if (!overlay) return;
+  overlay.classList.remove('visible');
+  sheet.classList.remove('visible');
+  setTimeout(() => { overlay.remove(); sheet.remove(); }, 300);
+}
+
+function refreshCurrentView() {
+  if (currentView === 'home') {
+    loadHomeView();
+  } else if (currentView === 'rooms') {
+    if (currentRoomId) {
+      loadRoomDetail(currentRoomId);
+    } else {
+      loadRoomsView();
+    }
+  } else if (currentView === 'lists' && currentChecklistId) {
+    loadChecklistDetail(currentChecklistId);
+  }
+}
+
 // Expose functions globally
 window.loadHomeView = loadHomeView;
 window.loadRoomsView = loadRoomsView;
@@ -880,3 +1107,10 @@ window.stepInterval = stepInterval;
 window.submitIntervalAdjust = submitIntervalAdjust;
 window.confirmInterval = confirmInterval;
 window.dismissIntervalModal = dismissIntervalModal;
+window.openChoreEditor = openChoreEditor;
+window.openChoreCreator = openChoreCreator;
+window.stepFormValue = stepFormValue;
+window.submitChoreForm = submitChoreForm;
+window.confirmDeleteChore = confirmDeleteChore;
+window.deleteChore = deleteChore;
+window.dismissChoreForm = dismissChoreForm;

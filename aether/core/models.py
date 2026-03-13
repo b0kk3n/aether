@@ -113,6 +113,7 @@ class ChoreCreate(ChoreBase):
 class ChoreUpdate(BaseModel):
     """Model for updating a chore."""
     name: Optional[str] = None
+    room_id: Optional[str] = None
     interval_days: Optional[int] = None
     estimated_minutes: Optional[int] = None
     category: Optional[Category] = None

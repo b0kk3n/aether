@@ -292,6 +292,9 @@ class ChoreService:
         if update.name is not None:
             updates.append("name = ?")
             params.append(update.name)
+        if "room_id" in update.model_fields_set:
+            updates.append("room_id = ?")
+            params.append(update.room_id)
         if update.interval_days is not None:
             updates.append("interval_days = ?")
             params.append(update.interval_days)

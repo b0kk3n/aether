@@ -9,6 +9,7 @@ const API_BASE = '/api';
 let currentView = 'home';
 let currentRoomId = null;
 let currentChecklistId = null;
+let _editingChore = null; // Chore currently open in the edit form
 
 // DOM Elements
 const appContent = document.getElementById('app-content');
@@ -901,6 +902,7 @@ async function openChoreCreator(roomId = null) {
 
 function showChoreForm(chore, rooms, defaultRoomId = null) {
   const isEdit = !!chore;
+  _editingChore = chore || null;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'chore-form-overlay';
@@ -971,7 +973,7 @@ function showChoreForm(chore, rooms, defaultRoomId = null) {
         ${isEdit ? 'Save changes' : 'Add chore'}
       </button>
       ${isEdit ? `
-        <button class="modal-btn modal-btn-secondary chore-delete-btn" onclick="confirmDeleteChore('${chore.id}', ${JSON.stringify(chore.name)})">
+        <button class="modal-btn modal-btn-secondary chore-delete-btn" onclick="confirmDeleteChore()">
           Delete chore
         </button>
       ` : ''}
@@ -1036,15 +1038,17 @@ async function submitChoreForm(choreId, isEdit) {
   }
 }
 
-function confirmDeleteChore(choreId, choreName) {
+function confirmDeleteChore() {
+  if (!_editingChore) return;
   const sheet = document.getElementById('chore-form-sheet');
   if (!sheet) return;
+  const name = _editingChore.name.replace(/"/g, '&quot;');
   sheet.innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Delete chore?</div>
-    <div class="modal-subtitle">"${choreName}" and its completion history will be removed permanently.</div>
+    <div class="modal-subtitle">"${name}" and its completion history will be removed permanently.</div>
     <div class="modal-buttons">
-      <button class="modal-btn modal-btn-primary chore-delete-btn" onclick="deleteChore('${choreId}')">
+      <button class="modal-btn modal-btn-primary chore-delete-btn" onclick="deleteChore()">
         Yes, delete
       </button>
       <button class="modal-btn modal-btn-tertiary" onclick="dismissChoreForm()">
@@ -1054,7 +1058,9 @@ function confirmDeleteChore(choreId, choreName) {
   `;
 }
 
-async function deleteChore(choreId) {
+async function deleteChore() {
+  if (!_editingChore) return;
+  const choreId = _editingChore.id;
   try {
     await api(`/chores/${choreId}`, { method: 'DELETE' });
     dismissChoreForm();
@@ -1069,6 +1075,7 @@ function dismissChoreForm() {
   const overlay = document.getElementById('chore-form-overlay');
   const sheet = document.getElementById('chore-form-sheet');
   if (!overlay) return;
+  _editingChore = null;
   overlay.classList.remove('visible');
   sheet.classList.remove('visible');
   setTimeout(() => { overlay.remove(); sheet.remove(); }, 300);

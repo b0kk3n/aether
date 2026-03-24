@@ -174,9 +174,6 @@ CHECKLISTS = [
             # Declutter
             ("Living room", "Declutter living room"),
             ("Office & Dining room", "Declutter dining room"),
-            # Dust
-            ("Living room", "Dust living room surfaces"),
-            ("Office & Dining room", "Dust dining room surfaces"),
             # Vacuum
             ("Living room", "Vacuum living room"),
             ("Office & Dining room", "Vacuum dining room"),
@@ -184,8 +181,6 @@ CHECKLISTS = [
             ("Kitchen", "Vacuum kitchen floor"),
             ("Toilet", "Vacuum toilet"),
             # Mop
-            ("Toilet", "Mop toilet"),
-            ("Hallway", "Mop hallway"),
             ("Kitchen", "Mop kitchen floor"),
             # Clean
             ("Toilet", "Clean toilet"),
@@ -204,10 +199,6 @@ CHECKLISTS = [
             # Declutter
             ("Bedroom", "Declutter bedroom"),
             ("Bathroom", "Wipe countertops"),
-            # Dust
-            ("Living room", "Dust living room surfaces"),
-            ("Office & Dining room", "Dust dining room surfaces"),
-            ("Bedroom", "Dust bedroom surfaces"),
             # Vacuum
             ("Living room", "Vacuum living room"),
             ("Office & Dining room", "Vacuum dining room"),

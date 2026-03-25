@@ -831,6 +831,110 @@ body {
   color: var(--overdue) !important;
 }
 
+/* Checklist remove button */
+.checklist-remove-btn {
+  background: none;
+  border: none;
+  padding: var(--space-xs);
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.checklist-remove-btn:active {
+  color: var(--overdue);
+}
+
+.checklist-remove-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Chore picker (add chore to checklist) */
+.chore-picker-room {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--font-weight-medium);
+  margin: var(--space-lg) 0 var(--space-sm);
+}
+
+.chore-picker-room:first-child {
+  margin-top: var(--space-sm);
+}
+
+.chore-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-md) 0;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chore-picker-item:last-of-type {
+  border-bottom: none;
+}
+
+.chore-picker-item:active {
+  opacity: 0.6;
+}
+
+.chore-picker-name {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.chore-picker-meta {
+  font-size: var(--font-size-caption);
+  color: var(--text-secondary);
+}
+
+/* Icon picker (create checklist) */
+.icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.icon-picker-btn {
+  width: 44px;
+  height: 44px;
+  background: var(--bg-surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.icon-picker-btn.selected {
+  border-color: var(--text-primary);
+}
+
+.icon-picker-btn:active {
+  opacity: 0.7;
+}
+
 /* Utilities */
 .text-fresh { color: var(--fresh); }
 .text-overdue { color: var(--overdue); }

@@ -10,6 +10,7 @@ let currentView = 'home';
 let currentRoomId = null;
 let currentChecklistId = null;
 let _editingChore = null; // Chore currently open in the edit form
+let _currentChecklistChoreIds = new Set(); // IDs of chores in the open checklist
 
 // DOM Elements
 const appContent = document.getElementById('app-content');
@@ -412,8 +413,14 @@ async function loadListsView() {
 
 function renderListsView(lists) {
   const html = `
-    <div class="greeting">
+    <div class="view-header">
       <div class="greeting-text">Checklists</div>
+      <button class="icon-btn" onclick="showCreateChecklistForm()" title="New checklist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
     </div>
 
     ${lists.length > 0 ? lists.map(list => `
@@ -447,13 +454,24 @@ async function loadChecklistDetail(checklistId) {
 }
 
 function renderChecklistDetail(checklist) {
+  // Track which chores are already in this checklist (for the adder picker)
+  _currentChecklistChoreIds = new Set(checklist.chores.map(c => c.id));
+
   const html = `
-    <a href="#" class="back-btn" onclick="loadListsView(); return false;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="15 18 9 12 15 6"></polyline>
-      </svg>
-      Checklists
-    </a>
+    <div class="view-header">
+      <a href="#" class="back-btn" onclick="loadListsView(); return false;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        Checklists
+      </a>
+      <button class="icon-btn" onclick="openChecklistChoreAdder()" title="Add chore">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+    </div>
 
     <div class="checklist-header">
       <div class="title">${checklist.icon} ${checklist.name}</div>
@@ -465,7 +483,12 @@ function renderChecklistDetail(checklist) {
     </div>
 
     <div id="checklist-items">
-      ${[...checklist.chores].sort((a, b) => {
+      ${checklist.chores.length === 0 ? `
+        <div class="empty-state" style="padding: var(--space-xl) 0;">
+          <div class="empty-state-icon">+</div>
+          <div class="empty-state-text">Tap + to add chores</div>
+        </div>
+      ` : [...checklist.chores].sort((a, b) => {
         const aDone = !a.is_overdue && a.days_until_due > 0;
         const bDone = !b.is_overdue && b.days_until_due > 0;
         return aDone === bDone ? 0 : aDone ? 1 : -1;
@@ -486,7 +509,12 @@ function renderChecklistDetail(checklist) {
                 ${chore.room_name || 'House-wide'} · ${formatDueDate(chore.days_until_due)}
               </div>
             </div>
-            ${chore.is_overdue ? '<div class="chore-status overdue"></div>' : ''}
+            <button class="checklist-remove-btn" onclick="removeChoreFromChecklist('${chore.id}')" title="Remove from list">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
         `;
       }).join('')}
@@ -877,6 +905,197 @@ function dismissIntervalModal() {
   }, 300);
 }
 
+// Checklist Management
+
+async function removeChoreFromChecklist(choreId) {
+  try {
+    await api(`/checklists/${currentChecklistId}/chores/${choreId}`, { method: 'DELETE' });
+    loadChecklistDetail(currentChecklistId);
+  } catch (err) {
+    console.error('Failed to remove chore from checklist:', err);
+  }
+}
+
+async function openChecklistChoreAdder() {
+  try {
+    const allChores = await api('/chores');
+    // Filter to chores not already in the checklist
+    const available = allChores.filter(c => !_currentChecklistChoreIds.has(c.id));
+    showChecklistChoreAdder(available);
+  } catch (err) {
+    console.error('Failed to load chores:', err);
+  }
+}
+
+function showChecklistChoreAdder(chores) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'checklist-adder-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet chore-form-sheet';
+  sheet.id = 'checklist-adder-sheet';
+
+  // Group by room
+  const groups = {};
+  chores.forEach(c => {
+    const roomName = c.room ? c.room.name : 'House-wide';
+    if (!groups[roomName]) groups[roomName] = [];
+    groups[roomName].push(c);
+  });
+
+  const groupsHtml = Object.entries(groups).map(([roomName, roomChores]) => `
+    <div class="chore-picker-room">${roomName}</div>
+    ${roomChores.map(c => `
+      <button class="chore-picker-item" onclick="addChoreToChecklist('${c.id}')">
+        <span class="chore-picker-name">${c.name}</span>
+        <span class="chore-picker-meta">${c.estimated_minutes} min · every ${c.interval_days}d</span>
+      </button>
+    `).join('')}
+  `).join('');
+
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Add chore</div>
+    ${chores.length === 0 ? `
+      <div class="modal-subtitle">All chores are already in this list.</div>
+    ` : groupsHtml}
+    <div class="modal-buttons" style="margin-top: var(--space-lg);">
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissChecklistAdder()">Cancel</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+  overlay.addEventListener('click', dismissChecklistAdder);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+  });
+}
+
+async function addChoreToChecklist(choreId) {
+  dismissChecklistAdder();
+  try {
+    await api(`/checklists/${currentChecklistId}/chores/${choreId}`, { method: 'POST' });
+    loadChecklistDetail(currentChecklistId);
+  } catch (err) {
+    console.error('Failed to add chore to checklist:', err);
+  }
+}
+
+function dismissChecklistAdder() {
+  const overlay = document.getElementById('checklist-adder-overlay');
+  const sheet = document.getElementById('checklist-adder-sheet');
+  if (!overlay) return;
+  overlay.classList.remove('visible');
+  sheet.classList.remove('visible');
+  setTimeout(() => { overlay.remove(); sheet.remove(); }, 300);
+}
+
+// Create Checklist
+
+const CHECKLIST_ICONS = ['📋', '🏠', '🧹', '🛁', '🛋️', '🌿', '🎉', '✈️', '🌙', '☀️', '🎄', '🌸'];
+let _selectedChecklistIcon = '📋';
+
+function showCreateChecklistForm() {
+  _selectedChecklistIcon = '📋';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'checklist-form-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet chore-form-sheet';
+  sheet.id = 'checklist-form-sheet';
+
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">New checklist</div>
+
+    <div class="form-group">
+      <label class="form-label">Icon</label>
+      <div class="icon-picker">
+        ${CHECKLIST_ICONS.map(icon => `
+          <button class="icon-picker-btn ${icon === _selectedChecklistIcon ? 'selected' : ''}"
+            onclick="selectChecklistIcon('${icon}')">${icon}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input type="text" id="checklist-form-name" class="form-input"
+        placeholder="e.g. Parents visiting"
+        autocomplete="off" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description <span style="color:var(--text-tertiary);font-size:var(--font-size-caption);">(optional)</span></label>
+      <input type="text" id="checklist-form-desc" class="form-input"
+        placeholder="e.g. Get the house ready for guests"
+        autocomplete="off" />
+    </div>
+
+    <div class="modal-buttons" style="margin-top: var(--space-lg);">
+      <button class="modal-btn modal-btn-primary" onclick="submitCreateChecklist()">Create</button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissChecklistForm()">Cancel</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+  overlay.addEventListener('click', dismissChecklistForm);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+    const nameInput = document.getElementById('checklist-form-name');
+    if (nameInput) nameInput.focus();
+  });
+}
+
+function selectChecklistIcon(icon) {
+  _selectedChecklistIcon = icon;
+  document.querySelectorAll('.icon-picker-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.textContent === icon);
+  });
+}
+
+async function submitCreateChecklist() {
+  const name = document.getElementById('checklist-form-name')?.value?.trim();
+  const description = document.getElementById('checklist-form-desc')?.value?.trim() || '';
+
+  if (!name) {
+    const nameInput = document.getElementById('checklist-form-name');
+    if (nameInput) { nameInput.focus(); nameInput.style.borderColor = 'var(--overdue)'; }
+    return;
+  }
+
+  try {
+    const newList = await api('/checklists', {
+      method: 'POST',
+      body: JSON.stringify({ name, description, icon: _selectedChecklistIcon, chore_ids: [] }),
+    });
+    dismissChecklistForm();
+    // Navigate straight into the new checklist so user can add chores
+    currentChecklistId = newList.id;
+    loadChecklistDetail(newList.id);
+  } catch (err) {
+    console.error('Failed to create checklist:', err);
+  }
+}
+
+function dismissChecklistForm() {
+  const overlay = document.getElementById('checklist-form-overlay');
+  const sheet = document.getElementById('checklist-form-sheet');
+  if (!overlay) return;
+  overlay.classList.remove('visible');
+  sheet.classList.remove('visible');
+  setTimeout(() => { overlay.remove(); sheet.remove(); }, 300);
+}
+
 // Chore Management (Create / Edit / Delete)
 
 async function openChoreEditor(choreId) {
@@ -1121,3 +1340,11 @@ window.submitChoreForm = submitChoreForm;
 window.confirmDeleteChore = confirmDeleteChore;
 window.deleteChore = deleteChore;
 window.dismissChoreForm = dismissChoreForm;
+window.removeChoreFromChecklist = removeChoreFromChecklist;
+window.openChecklistChoreAdder = openChecklistChoreAdder;
+window.addChoreToChecklist = addChoreToChecklist;
+window.dismissChecklistAdder = dismissChecklistAdder;
+window.showCreateChecklistForm = showCreateChecklistForm;
+window.selectChecklistIcon = selectChecklistIcon;
+window.submitCreateChecklist = submitCreateChecklist;
+window.dismissChecklistForm = dismissChecklistForm;

@@ -1,11 +1,14 @@
 """FastAPI application for Aether Home Concierge."""
 
+import json
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from aether.core import init_db, migrate_db
 from aether.api.routes import (
@@ -26,6 +29,21 @@ async def lifespan(app: FastAPI):
     # Shutdown: nothing to do
 
 
+class IngressMiddleware(BaseHTTPMiddleware):
+    """Propagates HA's X-Ingress-Path header into the ASGI root_path.
+
+    When accessed through Home Assistant ingress (including via Nabu Casa),
+    HA strips its own prefix and sets X-Ingress-Path so the app can generate
+    correct absolute URLs. Without this, redirects and OpenAPI docs break.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        ingress_path = request.headers.get("x-ingress-path", "")
+        if ingress_path:
+            request.scope["root_path"] = ingress_path
+        return await call_next(request)
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
@@ -35,10 +53,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware for development
+    # Ingress middleware must wrap everything so root_path is set before any
+    # route handler or redirect runs.
+    app.add_middleware(IngressMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # In production, specify actual origins
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -55,17 +76,42 @@ def create_app() -> FastAPI:
     def health_check():
         return {"status": "ok", "version": "0.3.0"}
 
-    # Static files and PWA
+    # Dynamic PWA manifest — patches start_url and icon paths so they are
+    # correct when served behind the HA ingress proxy. Must be registered
+    # BEFORE app.mount("/static", ...) so this route takes precedence.
+    @app.get("/static/manifest.json")
+    async def serve_manifest(request: Request):
+        manifest_path = Path(__file__).parent.parent / "web" / "static" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        ingress_path = request.headers.get("x-ingress-path", "")
+        manifest["start_url"] = f"{ingress_path}/" if ingress_path else "/"
+        for icon in manifest.get("icons", []):
+            src = icon.get("src", "")
+            if src.startswith("/"):
+                icon["src"] = f"{ingress_path}{src}" if ingress_path else src
+        return JSONResponse(manifest)
+
+    # Static files
     static_dir = Path(__file__).parent.parent / "web" / "static"
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-    # Serve index.html for root and SPA routes
+    # Serve index.html with dynamically injected ingress base path. The
+    # <base href> tag makes all relative asset URLs resolve correctly, and
+    # window.AETHER_BASE lets app.js prefix its API calls appropriately.
     @app.get("/")
-    async def serve_root():
+    async def serve_root(request: Request):
         index_path = Path(__file__).parent.parent / "web" / "templates" / "index.html"
         if index_path.exists():
-            return FileResponse(index_path)
+            ingress_path = request.headers.get("x-ingress-path", "")
+            base_href = f"{ingress_path}/" if ingress_path else "/"
+            injection = (
+                f'\n  <base href="{base_href}">'
+                f'\n  <script>window.AETHER_BASE = "{ingress_path}";</script>'
+            )
+            html = index_path.read_text()
+            html = html.replace("<head>", f"<head>{injection}", 1)
+            return HTMLResponse(html)
         return {"message": "Aether API is running. Web UI not found."}
 
     return app

@@ -1,0 +1,24 @@
+name: Aether
+version: "0.3.0"
+slug: aether
+description: "Home Concierge – your home, managed. Your mind, free."
+url: "https://github.com/b0kk3n/aether"
+arch:
+  - aarch64
+  - armv7
+  - amd64
+startup: application
+boot: auto
+init: false
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:broom
+panel_title: Aether
+homeassistant_api: false
+host_network: false
+ports:
+  8099/tcp: null
+options:
+  log_level: info
+schema:
+  log_level: list(debug|info|warning|error)

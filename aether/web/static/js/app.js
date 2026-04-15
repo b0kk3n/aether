@@ -3,7 +3,7 @@
  * Main application JavaScript
  */
 
-const API_BASE = '/api';
+const API_BASE = (window.AETHER_BASE || '') + '/api';
 
 // State
 let currentView = 'home';

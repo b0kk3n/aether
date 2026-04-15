@@ -1,14 +1,33 @@
-FROM python:3.11 AS builder
+ARG BUILD_FROM
+FROM $BUILD_FROM
 
-ENV PYTHONUNBUFFERED=1 \
+# Install system build dependencies
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    python3-dev
+
+WORKDIR /app
+
+# Install Python dependencies via requirements.txt rather than pyproject.toml.
+# This uses plain uvicorn (no [standard] extras) so the image builds on
+# armv7 (RPi 3), where uvloop — included in uvicorn[standard] — is unavailable.
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Copy application source — accessible here because the repo root is the
+# Docker build context (config.yaml lives at the root, not in a subfolder).
+COPY aether/ ./aether/
+
+# /data is mapped to persistent storage by the HA supervisor
+RUN mkdir -p /data
+
+ENV AETHER_DB_PATH=/data/aether.db \
+    PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
-WORKDIR /app
 
-RUN python -m venv .venv
-COPY pyproject.toml ./
-RUN .venv/bin/pip install .
-FROM python:3.11-slim
-WORKDIR /app
-COPY --from=builder /app/.venv .venv/
-COPY . .
-CMD ["/app/.venv/bin/fastapi", "run"]
+COPY run.sh /run.sh
+RUN chmod a+x /run.sh
+
+CMD ["/run.sh"]

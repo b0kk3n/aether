@@ -14,17 +14,12 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 # Copy the aether package source
 COPY aether/ ./aether/
 
-# Copy web assets to an explicit, fixed location so app.py never has to
-# guess where they are regardless of how Python resolves __file__.
-COPY aether/web/static/  /app/web/static/
-COPY aether/web/templates/ /app/web/templates/
-
 # /data is mapped to persistent storage by the HA supervisor
 RUN mkdir -p /data
 
 ENV AETHER_DB_PATH=/data/aether.db \
-    AETHER_STATIC_DIR=/app/web/static \
-    AETHER_TEMPLATE_DIR=/app/web/templates \
+    AETHER_STATIC_DIR=/app/aether/web/static \
+    AETHER_TEMPLATE_DIR=/app/aether/web/templates \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 

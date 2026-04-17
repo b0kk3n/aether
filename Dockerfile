@@ -6,22 +6,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install dependencies first (plain uvicorn — no [standard] extras so the
-# image builds on armv7 where uvloop is unavailable).
+# Install dependencies (plain uvicorn — no [standard] extras so the image
+# builds on armv7 where uvloop is unavailable).
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Install the aether package from source. pip copies the static files into
-# site-packages via the package-data declaration in pyproject.toml, giving
-# Path(__file__) a stable, predictable location regardless of WORKDIR.
+# Copy the aether package source
 COPY aether/ ./aether/
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir --no-deps .
+
+# Copy web assets to an explicit, fixed location so app.py never has to
+# guess where they are regardless of how Python resolves __file__.
+COPY aether/web/static/  /app/web/static/
+COPY aether/web/templates/ /app/web/templates/
 
 # /data is mapped to persistent storage by the HA supervisor
 RUN mkdir -p /data
 
 ENV AETHER_DB_PATH=/data/aether.db \
+    AETHER_STATIC_DIR=/app/web/static \
+    AETHER_TEMPLATE_DIR=/app/web/templates \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 

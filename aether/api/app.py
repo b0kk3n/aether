@@ -17,16 +17,21 @@ from aether.api.routes import (
     checklists_router,
     dashboard_router,
 )
+import aether.web as _web_module
+
+# Locate web assets via the aether.web module's __file__ — reliable whether
+# the package is installed in site-packages or run directly from source.
+_WEB_DIR = Path(_web_module.__file__).parent
+_STATIC_DIR = _WEB_DIR / "static"
+_TEMPLATE_DIR = _WEB_DIR / "templates"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Startup: initialize database
     init_db()
     migrate_db()
     yield
-    # Shutdown: nothing to do
 
 
 class IngressMiddleware(BaseHTTPMiddleware):
@@ -53,8 +58,6 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Ingress middleware must wrap everything so root_path is set before any
-    # route handler or redirect runs.
     app.add_middleware(IngressMiddleware)
 
     app.add_middleware(
@@ -71,18 +74,15 @@ def create_app() -> FastAPI:
     app.include_router(checklists_router, prefix="/api")
     app.include_router(dashboard_router, prefix="/api")
 
-    # Health check
     @app.get("/api/health")
     def health_check():
         return {"status": "ok", "version": "0.3.0"}
 
-    # Dynamic PWA manifest — patches start_url and icon paths so they are
-    # correct when served behind the HA ingress proxy. Must be registered
-    # BEFORE app.mount("/static", ...) so this route takes precedence.
+    # Dynamic PWA manifest — patches start_url and icon paths for ingress.
+    # Must be registered BEFORE app.mount("/static", ...) so this route wins.
     @app.get("/static/manifest.json")
     async def serve_manifest(request: Request):
-        manifest_path = Path(__file__).parent.parent / "web" / "static" / "manifest.json"
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads((_STATIC_DIR / "manifest.json").read_text())
         ingress_path = request.headers.get("x-ingress-path", "")
         manifest["start_url"] = f"{ingress_path}/" if ingress_path else "/"
         for icon in manifest.get("icons", []):
@@ -91,20 +91,12 @@ def create_app() -> FastAPI:
                 icon["src"] = f"{ingress_path}{src}" if ingress_path else src
         return JSONResponse(manifest)
 
-    # Static files
-    static_dir = Path(__file__).parent.parent / "web" / "static"
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    if _STATIC_DIR.exists():
+        app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
-    # Serve index.html, injecting the HA ingress path when available.
-    # If X-Ingress-Path is absent (direct access or header not forwarded),
-    # serve the HTML unmodified — relative asset paths resolve naturally
-    # relative to the browser's current URL, which already includes the
-    # ingress prefix. Only inject when we have a confirmed ingress path so
-    # we never accidentally set <base href="/"> and redirect assets to HA.
     @app.get("/")
     async def serve_root(request: Request):
-        index_path = Path(__file__).parent.parent / "web" / "templates" / "index.html"
+        index_path = _TEMPLATE_DIR / "index.html"
         if index_path.exists():
             html = index_path.read_text()
             ingress_path = request.headers.get("x-ingress-path", "")

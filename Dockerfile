@@ -6,15 +6,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Use requirements.txt instead of pyproject.toml so we can install plain
-# uvicorn (no [standard] extras), keeping the image buildable on armv7 where
-# uvloop is unavailable.
+# Install dependencies first (plain uvicorn — no [standard] extras so the
+# image builds on armv7 where uvloop is unavailable).
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Full source is accessible here because config.yaml lives at the repo root,
-# making the entire repo the Docker build context.
+# Install the aether package from source. pip copies the static files into
+# site-packages via the package-data declaration in pyproject.toml, giving
+# Path(__file__) a stable, predictable location regardless of WORKDIR.
 COPY aether/ ./aether/
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir --no-deps .
 
 # /data is mapped to persistent storage by the HA supervisor
 RUN mkdir -p /data

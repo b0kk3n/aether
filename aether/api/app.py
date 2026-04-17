@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Aether",
         description="Home Concierge - Your home, managed. Your mind, free.",
-        version="0.3.0",
+        version="0.3.1",
         lifespan=lifespan,
     )
 

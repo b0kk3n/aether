@@ -18,11 +18,8 @@ Install the Aether custom component from the `homeassistant/custom_components/`
 folder in the repository to get HA sensors and services:
 
 **Sensors** (update every 5 minutes):
-- `sensor.aether_tasks_due_today`
-- `sensor.aether_overdue_tasks`
-- `sensor.aether_chores_due`
-- `sensor.aether_energy_level`
-- `sensor.aether_next_event`
+- `sensor.aether_overdue_chores` — number of overdue chores
+- `sensor.aether_chores_due_soon` — chores due in the next 3 days
 
 Add this to your `configuration.yaml` to connect the component to the add-on:
 
@@ -32,8 +29,9 @@ aether:
   port: 8099
 ```
 
-**Services**: `aether.add_task`, `aether.complete_task`, `aether.complete_chore`,
-`aether.set_energy`, `aether.what_now`
+**Services**:
+- `aether.complete_chore` — mark a chore complete by ID
+- `aether.what_now` — get suggestions for available time (fires an `aether_what_now` event)
 
 ## Configuration
 

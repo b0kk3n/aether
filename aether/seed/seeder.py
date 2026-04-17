@@ -15,9 +15,15 @@ def seed_rooms() -> dict[str, str]:
     """Seed all rooms and return mapping of name -> id."""
     room_ids = {}
     for room_data in ROOMS:
-        room = RoomService.create(RoomCreate(**room_data))
-        room_ids[room.name] = room.id
-        print(f"  Created room: {room.icon} {room.name}")
+        # Check if room already exists
+        existing = RoomService.get_by_name(room_data["name"])
+        if existing:
+            room_ids[existing.name] = existing.id
+            print(f"  Room exists: {room_data['icon']} {existing.name}")
+        else:
+            room = RoomService.create(RoomCreate(**room_data))
+            room_ids[room.name] = room.id
+            print(f"  Created room: {room.icon} {room.name}")
     return room_ids
 
 
@@ -33,7 +39,7 @@ def seed_chores(room_ids: dict[str, str]) -> dict[tuple[str, str], str]:
             notes = chore_data[4] if len(chore_data) > 4 else ""
             chore = ChoreService.create(ChoreCreate(
                 name=name,
-                room_id=room_id,
+                room_id=None,
                 interval_days=interval,
                 estimated_minutes=minutes,
                 category=category,

@@ -946,3 +946,139 @@ body {
 .mb-sm { margin-bottom: var(--space-sm); }
 .mb-md { margin-bottom: var(--space-md); }
 .mb-lg { margin-bottom: var(--space-lg); }
+
+/* Confirmation Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+
+.modal-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--space-lg);
+  padding-bottom: calc(var(--space-lg) + var(--safe-bottom));
+  z-index: 201;
+  transform: translateY(100%);
+  transition: transform var(--transition-slow);
+}
+
+.modal-overlay.visible .modal-sheet {
+  transform: translateY(0);
+}
+
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto var(--space-lg);
+}
+
+.modal-title {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-sm);
+  text-align: center;
+}
+
+.modal-subtitle {
+  font-size: var(--font-size-body);
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: var(--space-lg);
+}
+
+.modal-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.modal-btn {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  border: none;
+}
+
+.modal-btn:active {
+  transform: scale(0.98);
+}
+
+.modal-btn-primary {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+.modal-btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.modal-btn-tertiary {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+/* Duration adjustment input */
+.duration-input-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.duration-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: none;
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.duration-btn:active {
+  background: var(--border);
+}
+
+.duration-value {
+  font-size: 32px;
+  font-weight: var(--font-weight-bold);
+  min-width: 100px;
+  text-align: center;
+}
+
+.duration-value span {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+}

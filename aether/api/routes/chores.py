@@ -128,6 +128,8 @@ def complete_chore(chore_id: str, request: CompleteRequest = CompleteRequest()):
     Optionally provide actual duration and feedback on estimate accuracy.
     If duration feedback is given twice as accurate, the estimate is confirmed.
     """
+    from datetime import datetime
+
     chore = ChoreService.get_by_id(chore_id)
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
@@ -135,6 +137,29 @@ def complete_chore(chore_id: str, request: CompleteRequest = CompleteRequest()):
     # Check if we should ask about duration/interval before completing
     ask_about_duration = ChoreService.should_ask_duration(chore_id)
     ask_about_interval = ChoreService.should_ask_interval(chore_id)
+
+    # Calculate interval deviation BEFORE completing
+    ask_about_interval = False
+    suggested_interval = None
+    interval_context = None
+
+    if chore.last_completed_at:
+        days_since = (datetime.now() - chore.last_completed_at).days
+        deviation = days_since - chore.interval_days
+
+        # Only ask if deviation is significant:
+        # - More than 2 days off (not just minor life variance)
+        # - More than 25% of the interval (proportionally significant)
+        min_deviation = max(3, int(chore.interval_days * 0.25))
+
+        if abs(deviation) >= min_deviation:
+            ask_about_interval = True
+            suggested_interval = days_since
+
+            if deviation < 0:
+                interval_context = f"{abs(deviation)} days early"
+            else:
+                interval_context = f"{deviation} days late"
 
     # Complete the chore
     updated_chore = ChoreService.complete(

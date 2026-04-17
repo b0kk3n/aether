@@ -19,8 +19,167 @@ const navItems = document.querySelectorAll('.nav-item');
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
+  initModal();
   loadView('home');
 });
+
+// Modal Management
+function initModal() {
+  // Create modal overlay
+  const modalOverlay = document.createElement('div');
+  modalOverlay.id = 'modal-overlay';
+  modalOverlay.className = 'modal-overlay';
+  modalOverlay.innerHTML = `
+    <div class="modal-sheet" id="modal-sheet">
+      <div class="modal-handle"></div>
+      <div id="modal-content"></div>
+    </div>
+  `;
+  document.body.appendChild(modalOverlay);
+
+  // Close on overlay click
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) {
+      hideModal();
+    }
+  });
+}
+
+function showModal(content) {
+  const modalContent = document.getElementById('modal-content');
+  modalContent.innerHTML = content;
+  document.getElementById('modal-overlay').classList.add('visible');
+}
+
+function hideModal() {
+  document.getElementById('modal-overlay').classList.remove('visible');
+  pendingConfirmation = null;
+}
+
+function showDurationConfirmation(choreId, choreName, estimatedMinutes, onComplete) {
+  let adjustedMinutes = estimatedMinutes;
+
+  const content = `
+    <div class="modal-title">How long did that take?</div>
+    <div class="modal-subtitle">${choreName}</div>
+    <div class="duration-input-group">
+      <button class="duration-btn" onclick="adjustDuration(-5)">-</button>
+      <div class="duration-value" id="duration-display">${estimatedMinutes} <span>min</span></div>
+      <button class="duration-btn" onclick="adjustDuration(5)">+</button>
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-primary" onclick="confirmDuration('${choreId}', true)">About right</button>
+      <button class="modal-btn modal-btn-secondary" onclick="confirmDuration('${choreId}', false)">Use adjusted time</button>
+      <button class="modal-btn modal-btn-tertiary" onclick="skipConfirmation()">Skip</button>
+    </div>
+  `;
+
+  pendingConfirmation = {
+    choreId,
+    type: 'duration',
+    estimatedMinutes,
+    adjustedMinutes: estimatedMinutes,
+    onComplete
+  };
+  showModal(content);
+}
+
+function adjustDuration(delta) {
+  if (!pendingConfirmation) return;
+
+  pendingConfirmation.adjustedMinutes = Math.max(1, pendingConfirmation.adjustedMinutes + delta);
+  document.getElementById('duration-display').innerHTML =
+    `${pendingConfirmation.adjustedMinutes} <span>min</span>`;
+}
+
+async function confirmDuration(choreId, wasAccurate) {
+  if (!pendingConfirmation) return;
+
+  try {
+    // If they adjusted the time, update the chore estimate
+    if (!wasAccurate && pendingConfirmation.adjustedMinutes !== pendingConfirmation.estimatedMinutes) {
+      await api(`/chores/${choreId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ estimated_minutes: pendingConfirmation.adjustedMinutes })
+      });
+    }
+
+    // Record the duration feedback (already completed, just updating feedback)
+    // The completion already happened, so we just close and continue
+
+    const onComplete = pendingConfirmation.onComplete;
+    hideModal();
+
+    if (onComplete) onComplete();
+  } catch (err) {
+    console.error('Failed to update duration:', err);
+    hideModal();
+  }
+}
+
+function showIntervalConfirmation(choreId, choreName, currentInterval, suggestedInterval, context, onComplete) {
+  const content = `
+    <div class="modal-title">Adjust schedule?</div>
+    <div class="modal-subtitle">You did "${choreName}" ${context}.</div>
+    <div class="duration-input-group">
+      <button class="duration-btn" onclick="adjustInterval(-1)">-</button>
+      <div class="duration-value" id="interval-display">${suggestedInterval} <span>days</span></div>
+      <button class="duration-btn" onclick="adjustInterval(1)">+</button>
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-primary" onclick="confirmInterval('${choreId}')">Change to this</button>
+      <button class="modal-btn modal-btn-tertiary" onclick="skipConfirmation()">Keep at ${currentInterval} days</button>
+    </div>
+  `;
+
+  pendingConfirmation = {
+    choreId,
+    type: 'interval',
+    suggestedInterval,
+    onComplete
+  };
+  showModal(content);
+}
+
+function adjustInterval(delta) {
+  if (!pendingConfirmation) return;
+
+  pendingConfirmation.suggestedInterval = Math.max(1, pendingConfirmation.suggestedInterval + delta);
+  document.getElementById('interval-display').innerHTML =
+    `${pendingConfirmation.suggestedInterval} <span>days</span>`;
+}
+
+async function confirmInterval(choreId) {
+  if (!pendingConfirmation) return;
+
+  try {
+    await api(`/chores/${choreId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ interval_days: pendingConfirmation.suggestedInterval })
+    });
+
+    const onComplete = pendingConfirmation.onComplete;
+    hideModal();
+
+    if (onComplete) onComplete();
+  } catch (err) {
+    console.error('Failed to update interval:', err);
+    hideModal();
+  }
+}
+
+function skipConfirmation() {
+  const onComplete = pendingConfirmation?.onComplete;
+  hideModal();
+  if (onComplete) onComplete();
+}
+
+// Expose modal functions globally
+window.adjustDuration = adjustDuration;
+window.confirmDuration = confirmDuration;
+window.adjustInterval = adjustInterval;
+window.confirmInterval = confirmInterval;
+window.skipConfirmation = skipConfirmation;
 
 // Navigation
 function initNavigation() {
@@ -573,18 +732,42 @@ function initSwipeGestures() {
   });
 }
 
-// Complete Chore
+// Complete Chore (non-swipe, e.g., from checklists)
 async function completeChore(choreId) {
   try {
     const result = await api(`/chores/${choreId}/complete`, { method: 'POST' });
 
-    // Refresh current view
-    if (currentView === 'home') {
-      loadHomeView();
-    } else if (currentView === 'rooms' && currentRoomId) {
-      loadRoomDetail(currentRoomId);
-    } else if (currentView === 'lists' && currentChecklistId) {
-      loadChecklistDetail(currentChecklistId);
+    // Refresh view function
+    const refreshView = () => {
+      if (currentView === 'home') {
+        loadHomeView();
+      } else if (currentView === 'rooms' && currentRoomId) {
+        loadRoomDetail(currentRoomId);
+      } else if (currentView === 'lists' && currentChecklistId) {
+        loadChecklistDetail(currentChecklistId);
+      }
+    };
+
+    // Check if we need to show confirmations
+    if (result.ask_about_interval) {
+      showIntervalConfirmation(
+        choreId,
+        result.chore.name,
+        result.chore.interval_days,
+        result.suggested_interval,
+        result.interval_context,
+        () => {
+          if (result.ask_about_duration) {
+            showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes, refreshView);
+          } else {
+            refreshView();
+          }
+        }
+      );
+    } else if (result.ask_about_duration) {
+      showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes, refreshView);
+    } else {
+      refreshView();
     }
 
     // Show at most one confirmation modal per completion (duration takes priority)
@@ -630,13 +813,50 @@ async function completeChoreWithAnimation(container, choreId) {
     setTimeout(() => {
       container.remove();
 
-      // Check if list is now empty
-      const choreList = document.getElementById('chore-list');
-      if (choreList && choreList.children.length === 0) {
-        // Refresh the view
-        if (currentView === 'home') {
-          loadHomeView();
+      // Define what to do after any confirmation flow
+      const afterConfirmation = () => {
+        // Check if list is now empty
+        const choreList = document.getElementById('chore-list');
+        if (choreList && choreList.children.length === 0) {
+          // Refresh the view
+          if (currentView === 'home') {
+            loadHomeView();
+          }
         }
+      };
+
+      // Check if we need to show interval confirmation first (takes priority)
+      if (result.ask_about_interval) {
+        showIntervalConfirmation(
+          choreId,
+          result.chore.name,
+          result.chore.interval_days,
+          result.suggested_interval,
+          result.interval_context,
+          () => {
+            // After interval confirmation, check for duration
+            if (result.ask_about_duration) {
+              showDurationConfirmation(
+                choreId,
+                result.chore.name,
+                result.chore.estimated_minutes,
+                afterConfirmation
+              );
+            } else {
+              afterConfirmation();
+            }
+          }
+        );
+      } else if (result.ask_about_duration) {
+        // Only duration confirmation needed
+        showDurationConfirmation(
+          choreId,
+          result.chore.name,
+          result.chore.estimated_minutes,
+          afterConfirmation
+        );
+      } else {
+        afterConfirmation();
       }
 
       // Show at most one confirmation modal per completion (duration takes priority)

@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Aether",
         description="Home Concierge - Your home, managed. Your mind, free.",
-        version="0.3.2",
+        version="0.3.3",
         lifespan=lifespan,
     )
 
@@ -77,7 +77,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health_check():
-        return {"status": "ok", "version": "0.3.2"}
+        return {"status": "ok", "version": "0.3.3"}
 
     # Dynamic PWA manifest — patches start_url and icon paths for ingress.
     # Must be registered BEFORE app.mount("/static", ...) so this route wins.
@@ -97,17 +97,23 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def serve_root(request: Request):
         index_path = _TEMPLATE_DIR / "index.html"
-        if index_path.exists():
-            html = index_path.read_text()
-            ingress_path = request.headers.get("x-ingress-path", "")
-            if ingress_path:
-                injection = (
-                    f'\n  <base href="{ingress_path}/">'
-                    f'\n  <script>window.AETHER_BASE = "{ingress_path}";</script>'
-                )
-                html = html.replace("<head>", f"<head>{injection}", 1)
-            return HTMLResponse(html)
-        return {"message": "Aether API is running. Web UI not found."}
+        if not index_path.exists():
+            return {"message": "Aether API is running. Web UI not found."}
+
+        ingress_path = request.headers.get("x-ingress-path", "")
+        css = (_STATIC_DIR / "css" / "style.css").read_text()
+        js = (_STATIC_DIR / "js" / "app.js").read_text()
+
+        html = index_path.read_text()
+        html = html.replace(
+            '<link rel="stylesheet" href="static/css/style.css">',
+            f'<style>\n{css}\n</style>',
+        )
+        html = html.replace(
+            '<script src="static/js/app.js"></script>',
+            f'<script>\nwindow.AETHER_BASE = {json.dumps(ingress_path)};\n{js}\n</script>',
+        )
+        return HTMLResponse(html)
 
     return app
 

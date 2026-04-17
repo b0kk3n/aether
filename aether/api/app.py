@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Aether",
         description="Home Concierge - Your home, managed. Your mind, free.",
-        version="0.3.1",
+        version="0.3.2",
         lifespan=lifespan,
     )
 
@@ -77,7 +77,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health_check():
-        return {"status": "ok", "version": "0.3.0"}
+        return {"status": "ok", "version": "0.3.2"}
 
     # Dynamic PWA manifest — patches start_url and icon paths for ingress.
     # Must be registered BEFORE app.mount("/static", ...) so this route wins.
@@ -92,8 +92,7 @@ def create_app() -> FastAPI:
                 icon["src"] = f"{ingress_path}{src}" if ingress_path else src
         return JSONResponse(manifest)
 
-    if _STATIC_DIR.exists():
-        app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
     @app.get("/")
     async def serve_root(request: Request):

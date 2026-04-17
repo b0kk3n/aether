@@ -3,7 +3,13 @@
  * Main application JavaScript
  */
 
-const API_BASE = (window.AETHER_BASE || '') + '/api';
+// When served via HA ingress, window.AETHER_BASE is injected server-side.
+// Fallback: derive the base from the current page URL (works when
+// X-Ingress-Path is not forwarded — the browser URL already contains the
+// ingress prefix, e.g. /api/hassio_ingress/TOKEN/).
+const API_BASE = (window.AETHER_BASE != null && window.AETHER_BASE !== '')
+    ? window.AETHER_BASE + '/api'
+    : window.location.pathname.replace(/\/+$/, '') + '/api';
 
 // State
 let currentView = 'home';

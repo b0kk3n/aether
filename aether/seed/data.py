@@ -2,15 +2,17 @@
 
 Contains:
 - 10 rooms
-- 77 chores (69 room-specific + 6 house-wide + 2 maintenance)
+- chores (room-specific + house-wide + maintenance)
 - 2 checklists (Visitors, Sleepover)
 
 Duration estimates are initial guesses - users can adjust via the
 duration confirmation flow when completing chores.
+
+Chore tuple format: (name, interval_days, estimated_minutes, category[, notes])
+The notes field is optional.
 """
 
 from aether.core.models import Category
-
 
 # =============================================================================
 # Rooms
@@ -34,94 +36,100 @@ ROOMS = [
 # Chores by Room
 # =============================================================================
 
-# Format: (name, interval_days, estimated_minutes, category)
+# Format: (name, interval_days, estimated_minutes, category[, notes])
 
 CHORES_BY_ROOM = {
     "Entry": [
         ("Vacuum entryway", 10, 5, Category.VACUUM),
-        ("Mop entryway", 30, 8, Category.MOP),
+        ("Mop entryway", 30, 8, Category.MOP, "Do after vacuuming"),
         ("Declutter entryway", 60, 10, Category.DECLUTTER),
     ],
     "Hallway": [
         ("Vacuum hallway", 5, 5, Category.VACUUM),
-        ("Mop hallway", 10, 8, Category.MOP),
+        ("Mop hallway", 10, 8, Category.MOP, "Do after vacuuming"),
     ],
     "Living room": [
-        ("Declutter living room", 5, 15, Category.DECLUTTER),
-        ("Vacuum living room", 7, 15, Category.VACUUM),
-        ("Dust living room surfaces", 10, 15, Category.DUST),
-        ("Mop living room", 30, 20, Category.MOP),
-        ("Clean living room furniture", 30, 20, Category.CLEAN),
+        ("Declutter living room", 5, 10, Category.DECLUTTER),
+        ("Vacuum living room", 7, 10, Category.VACUUM),
+        ("Dust living room surfaces", 10, 5, Category.DUST),
+        ("Mop living room", 30, 15, Category.MOP, "Do after vacuuming"),
+        ("Clean living room furniture", 30, 15, Category.CLEAN),
         ("Clean living room surfaces", 30, 15, Category.CLEAN),
-        ("Wash living room blankets", 120, 10, Category.WASH),
+        ("Wash living room blankets", 120, 5, Category.WASH),
         ("Wash living room pillow cases", 160, 10, Category.WASH),
         ("Deep clean living room rug", 160, 45, Category.CLEAN),
+        ("Wash living room windows", 160, 60, Category.WASH),
         ("Wash living room curtains", 365, 15, Category.WASH),
     ],
     "Office & Dining room": [
         ("Wipe down dining room table", 3, 5, Category.WIPE),
-        ("Declutter dining room", 5, 15, Category.DECLUTTER),
-        ("Vacuum dining room", 7, 12, Category.VACUUM),
-        ("Dust dining room surfaces", 10, 12, Category.DUST),
-        ("Mop dining room", 30, 15, Category.MOP),
+        ("Declutter dining room", 5, 10, Category.DECLUTTER),
+        ("Vacuum dining room", 7, 10, Category.VACUUM),
+        ("Dust dining room surfaces", 10, 10, Category.DUST),
+        ("Mop dining room", 30, 15, Category.MOP, "Do after vacuuming"),
         ("Clean dining room surfaces", 30, 15, Category.CLEAN),
+        ("Wash office & dining room windows", 160, 60, Category.WASH),
         ("Wash dining room curtains", 365, 15, Category.WASH),
     ],
     "Bedroom": [
-        ("Declutter bedroom", 7, 15, Category.DECLUTTER),
-        ("Dust bedroom surfaces", 10, 12, Category.DUST),
-        ("Vacuum bedroom", 14, 12, Category.VACUUM),
+        ("Declutter bedroom", 7, 5, Category.DECLUTTER),
+        ("Dust bedroom surfaces", 10, 5, Category.DUST),
+        ("Vacuum bedroom", 14, 10, Category.VACUUM),
         ("Change bedsheets", 14, 10, Category.WASH),
-        ("Vacuum matras", 28, 10, Category.VACUUM),
-        ("Clean bedroom surfaces", 30, 15, Category.CLEAN),
-        ("Mop bedroom", 60, 15, Category.MOP),
-        ("Wash sleeping pillow", 120, 10, Category.WASH),
-        ("Wash matras cover", 120, 10, Category.WASH),
+        ("Vacuum matras", 28, 15, Category.VACUUM),
+        ("Clean bedroom surfaces", 30, 10, Category.CLEAN),
+        ("Mop bedroom", 60, 15, Category.MOP, "Do after vacuuming"),
+        ("Wash sleeping pillow", 120, 5, Category.WASH),
+        ("Wash matras cover", 120, 5, Category.WASH),
+        ("Wash bedroom windows", 160, 60, Category.WASH),
         ("Wash bedroom curtains", 365, 15, Category.WASH),
     ],
     "Bathroom": [
         ("Wipe countertops", 5, 5, Category.WIPE),
         ("Vacuum bathroom floor", 7, 5, Category.VACUUM),
-        ("Mop bathroom floor", 14, 10, Category.MOP),
-        ("Clean bathroom sink", 14, 8, Category.CLEAN),
+        ("Mop bathroom floor", 14, 10, Category.MOP, "Do after vacuuming"),
+        ("Clean bathroom sink", 14, 10, Category.CLEAN),
         ("Clean bathroom mirror", 21, 5, Category.CLEAN),
-        ("Wash bathroom rug", 21, 10, Category.WASH),
+        ("Wash bathroom rug", 21, 2, Category.WASH),
         ("Clean shower", 30, 20, Category.CLEAN),
-        ("Clean outside bathroom cabinets", 60, 15, Category.CLEAN),
-        ("Disinfect trashcan", 120, 10, Category.CLEAN),
+        ("Clean outside bathroom cabinets", 60, 10, Category.CLEAN),
+        ("Disinfect trashcan", 120, 5, Category.CLEAN),
         ("Clean inside bathroom cabinets", 160, 20, Category.CLEAN),
         ("Clean bathroom walls", 160, 30, Category.CLEAN),
+        ("Wash bathroom windows", 160, 60, Category.WASH),
     ],
     "Toilet": [
         ("Clean toilet", 7, 10, Category.CLEAN),
         ("Vacuum toilet", 7, 5, Category.VACUUM),
-        ("Mop toilet", 14, 8, Category.MOP),
-        ("Clean air ventilation toilet", 60, 15, Category.CLEAN),
+        ("Mop toilet", 14, 8, Category.MOP, "Do after vacuuming"),
+        ("Clean air ventilation toilet", 60, 5, Category.CLEAN),
     ],
     "Kitchen": [
         ("Wipe kitchen countertops", 3, 5, Category.WIPE),
         ("Vacuum kitchen floor", 5, 8, Category.VACUUM),
-        ("Clean kitchen sink", 7, 8, Category.CLEAN),
-        ("Clean stovetop", 7, 10, Category.CLEAN),
-        ("Mop kitchen floor", 10, 12, Category.MOP),
+        ("Clean kitchen sink", 7, 5, Category.CLEAN),
+        ("Clean stovetop", 7, 5, Category.CLEAN),
+        ("Mop kitchen floor", 10, 12, Category.MOP, "Do after vacuuming"),
         ("Descale kettle", 45, 10, Category.CLEAN),
-        ("Clean outside kitchen cabinets", 60, 20, Category.CLEAN),
-        ("Clean fridge", 60, 25, Category.CLEAN),
-        ("Disinfect trashcan", 60, 10, Category.CLEAN),
+        ("Clean outside kitchen cabinets", 60, 15, Category.CLEAN),
+        ("Clean fridge", 60, 20, Category.CLEAN),
+        ("Disinfect trashcan", 60, 5, Category.CLEAN),
         ("Clean oven", 90, 30, Category.CLEAN),
         ("Clean freezer", 160, 30, Category.CLEAN),
-        ("Clean inside kitchen cabinets", 160, 30, Category.CLEAN),
+        ("Clean inside kitchen cabinets", 160, 45, Category.CLEAN),
+        ("Wash kitchen windows", 160, 60, Category.WASH),
     ],
     "Storage": [
         ("Vacuum storage", 14, 8, Category.VACUUM),
         ("Dust storage surfaces", 28, 10, Category.DUST),
-        ("Mop storage", 42, 10, Category.MOP),
+        ("Mop storage", 42, 10, Category.MOP, "Do after vacuuming"),
         ("Declutter storage", 45, 30, Category.DECLUTTER),
         ("Clean storage surfaces", 60, 15, Category.CLEAN),
+        ("Wash storage windows", 160, 60, Category.WASH),
         ("Wash storage curtains", 365, 15, Category.WASH),
     ],
     "Balcony": [
-        ("Clean balcony floor", 180, 20, Category.CLEAN),
+        ("Clean balcony floor", 180, 30, Category.CLEAN),
         ("Clean balcony gutter", 180, 15, Category.CLEAN),
         ("Clean balcony furniture", 180, 20, Category.CLEAN),
     ],
@@ -133,12 +141,10 @@ CHORES_BY_ROOM = {
 # =============================================================================
 
 HOUSE_WIDE_CHORES = [
-    ("Water plants", 7, 10, Category.MAINTAIN),
     ("Clean doorhandles", 45, 15, Category.CLEAN),
     ("Clean light switches", 45, 15, Category.CLEAN),
-    ("Wash windows", 160, 60, Category.WASH),
-    ("Clean doors", 160, 30, Category.CLEAN),
-    ("Clean radiators", 200, 45, Category.CLEAN),
+    ("Clean doors", 160, 60, Category.CLEAN),
+    ("Clean radiators", 200, 60, Category.CLEAN),
 ]
 
 
@@ -168,9 +174,6 @@ CHECKLISTS = [
             # Declutter
             ("Living room", "Declutter living room"),
             ("Office & Dining room", "Declutter dining room"),
-            # Dust
-            ("Living room", "Dust living room surfaces"),
-            ("Office & Dining room", "Dust dining room surfaces"),
             # Vacuum
             ("Living room", "Vacuum living room"),
             ("Office & Dining room", "Vacuum dining room"),
@@ -178,8 +181,6 @@ CHECKLISTS = [
             ("Kitchen", "Vacuum kitchen floor"),
             ("Toilet", "Vacuum toilet"),
             # Mop
-            ("Toilet", "Mop toilet"),
-            ("Hallway", "Mop hallway"),
             ("Kitchen", "Mop kitchen floor"),
             # Clean
             ("Toilet", "Clean toilet"),
@@ -198,10 +199,6 @@ CHECKLISTS = [
             # Declutter
             ("Bedroom", "Declutter bedroom"),
             ("Bathroom", "Wipe countertops"),
-            # Dust
-            ("Living room", "Dust living room surfaces"),
-            ("Office & Dining room", "Dust dining room surfaces"),
-            ("Bedroom", "Dust bedroom surfaces"),
             # Vacuum
             ("Living room", "Vacuum living room"),
             ("Office & Dining room", "Vacuum dining room"),

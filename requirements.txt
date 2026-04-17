@@ -1,0 +1,16 @@
+# Add-on dependencies — mirrors pyproject.toml but uses plain uvicorn (no
+# [standard] extras) so the image builds on armv7 where uvloop is unavailable.
+fastapi>=0.109.0
+uvicorn>=0.27.0
+python-multipart>=0.0.6
+click>=8.1.0
+rich>=13.0.0
+pyyaml>=6.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dateutil>=2.8.0
+humanize>=4.0.0
+croniter>=1.3.0
+todoist-api-python>=2.1.0
+aiohttp>=3.9.0
+httpx>=0.26.0

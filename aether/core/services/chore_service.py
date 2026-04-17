@@ -41,6 +41,8 @@ class ChoreService:
             completion_count=row["completion_count"],
             duration_confirmed=bool(row["duration_confirmed"]),
             duration_confirmations=row["duration_confirmations"],
+            interval_confirmed=bool(row["interval_confirmed"]) if row["interval_confirmed"] is not None else False,
+            interval_confirmations=row["interval_confirmations"] if row["interval_confirmations"] is not None else 0,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
@@ -290,9 +292,15 @@ class ChoreService:
         if update.name is not None:
             updates.append("name = ?")
             params.append(update.name)
+        if "room_id" in update.model_fields_set:
+            updates.append("room_id = ?")
+            params.append(update.room_id)
         if update.interval_days is not None:
             updates.append("interval_days = ?")
             params.append(update.interval_days)
+            # Reset interval confirmation when schedule changes
+            updates.append("interval_confirmed = 0")
+            updates.append("interval_confirmations = 0")
         if update.estimated_minutes is not None:
             updates.append("estimated_minutes = ?")
             params.append(update.estimated_minutes)
@@ -445,5 +453,100 @@ class ChoreService:
         if chore.duration_confirmed:
             return False
 
-        # Ask on 1st, 3rd, 5th completions (when current count is 0, 2, 4...)
-        return chore.completion_count % 2 == 0
+        # Ask every other time until confirmed
+        return chore.completion_count % 2 == 1
+
+    @staticmethod
+    def should_ask_interval(chore_id: str) -> bool:
+        """Check if we should ask about interval accuracy.
+
+        Asks every 4th completion (offset from duration checks which ask every 2nd)
+        so the two prompts never appear on the same completion.
+        """
+        chore = ChoreService.get_by_id(chore_id)
+        if not chore:
+            return False
+
+        if chore.interval_confirmed:
+            return False
+
+        return chore.completion_count % 4 == 2
+
+    @staticmethod
+    def record_interval_feedback(
+        chore_id: str,
+        was_accurate: bool,
+        actual_days: Optional[int] = None,
+    ) -> Optional[Chore]:
+        """Record user feedback on interval accuracy.
+
+        If actual_days is provided and was_accurate is False, updates the
+        interval and resets confirmation counters.
+        """
+        chore = ChoreService.get_by_id(chore_id)
+        if not chore or chore.interval_confirmed:
+            return chore
+
+        interval_confirmations = chore.interval_confirmations
+        interval_confirmed = chore.interval_confirmed
+
+        if was_accurate:
+            interval_confirmations += 1
+            if interval_confirmations >= 2:
+                interval_confirmed = True
+
+        with get_db() as conn:
+            if not was_accurate and actual_days and actual_days > 0:
+                conn.execute(
+                    """UPDATE chores SET interval_days = ?,
+                       interval_confirmed = 0, interval_confirmations = 0
+                       WHERE id = ?""",
+                    (actual_days, chore_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE chores SET interval_confirmed = ?, interval_confirmations = ? WHERE id = ?",
+                    (1 if interval_confirmed else 0, interval_confirmations, chore_id),
+                )
+
+        return ChoreService.get_by_id(chore_id)
+
+    @staticmethod
+    def record_duration_feedback(
+        chore_id: str,
+        was_accurate: bool,
+        actual_minutes: Optional[int] = None,
+    ) -> Optional[Chore]:
+        """Record user feedback on duration estimate accuracy.
+
+        If actual_minutes is provided and was_accurate is False, updates the
+        estimate and resets confirmation counters.
+        """
+        chore = ChoreService.get_by_id(chore_id)
+        if not chore or chore.duration_confirmed:
+            return chore
+
+        duration_confirmations = chore.duration_confirmations
+        duration_confirmed = chore.duration_confirmed
+
+        if was_accurate:
+            duration_confirmations += 1
+            if duration_confirmations >= 2:
+                duration_confirmed = True
+
+        with get_db() as conn:
+            if not was_accurate and actual_minutes and actual_minutes > 0:
+                # Update estimate and reset counters so the new estimate gets confirmed
+                conn.execute(
+                    """UPDATE chores SET estimated_minutes = ?,
+                       duration_confirmed = 0, duration_confirmations = 0
+                       WHERE id = ?""",
+                    (actual_minutes, chore_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE chores SET duration_confirmed = ?, duration_confirmations = ? WHERE id = ?",
+                    (1 if duration_confirmed else 0, duration_confirmations, chore_id),
+                )
+
+        return ChoreService.get_by_id(chore_id)

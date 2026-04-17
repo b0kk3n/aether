@@ -34,63 +34,49 @@ def seed_chores(room_ids: dict[str, str]) -> dict[tuple[str, str], str]:
     # Room-specific chores
     for room_name, chores in CHORES_BY_ROOM.items():
         room_id = room_ids.get(room_name)
-        created = 0
-        existed = 0
-        for name, interval, minutes, category in chores:
-            existing = ChoreService.get_by_name_and_room(name, room_id)
-            if existing:
-                chore_ids[(room_name, name)] = existing.id
-                existed += 1
-            else:
-                chore = ChoreService.create(ChoreCreate(
-                    name=name,
-                    room_id=room_id,
-                    interval_days=interval,
-                    estimated_minutes=minutes,
-                    category=category,
-                ))
-                chore_ids[(room_name, name)] = chore.id
-                created += 1
-        if existed:
-            print(f"  {room_name}: {created} created, {existed} already existed")
-        else:
-            print(f"  Created {len(chores)} chores for {room_name}")
+        for chore_data in chores:
+            name, interval, minutes, category = chore_data[:4]
+            notes = chore_data[4] if len(chore_data) > 4 else ""
+            chore = ChoreService.create(ChoreCreate(
+                name=name,
+                room_id=None,
+                interval_days=interval,
+                estimated_minutes=minutes,
+                category=category,
+                notes=notes,
+            ))
+            chore_ids[(room_name, name)] = chore.id
+        print(f"  Created {len(chores)} chores for {room_name}")
 
     # House-wide chores
-    created = 0
-    for name, interval, minutes, category in HOUSE_WIDE_CHORES:
-        existing = ChoreService.get_by_name_and_room(name, None)
-        if existing:
-            chore_ids[(None, name)] = existing.id
-        else:
-            chore = ChoreService.create(ChoreCreate(
-                name=name,
-                room_id=None,
-                interval_days=interval,
-                estimated_minutes=minutes,
-                category=category,
-            ))
-            chore_ids[(None, name)] = chore.id
-            created += 1
-    print(f"  Created {created} house-wide chores ({len(HOUSE_WIDE_CHORES) - created} existed)")
+    for chore_data in HOUSE_WIDE_CHORES:
+        name, interval, minutes, category = chore_data[:4]
+        notes = chore_data[4] if len(chore_data) > 4 else ""
+        chore = ChoreService.create(ChoreCreate(
+            name=name,
+            room_id=None,
+            interval_days=interval,
+            estimated_minutes=minutes,
+            category=category,
+            notes=notes,
+        ))
+        chore_ids[(None, name)] = chore.id
+    print(f"  Created {len(HOUSE_WIDE_CHORES)} house-wide chores")
 
     # Maintenance chores
-    created = 0
-    for name, interval, minutes, category in MAINTENANCE_CHORES:
-        existing = ChoreService.get_by_name_and_room(name, None)
-        if existing:
-            chore_ids[(None, name)] = existing.id
-        else:
-            chore = ChoreService.create(ChoreCreate(
-                name=name,
-                room_id=None,
-                interval_days=interval,
-                estimated_minutes=minutes,
-                category=category,
-            ))
-            chore_ids[(None, name)] = chore.id
-            created += 1
-    print(f"  Created {created} maintenance chores ({len(MAINTENANCE_CHORES) - created} existed)")
+    for chore_data in MAINTENANCE_CHORES:
+        name, interval, minutes, category = chore_data[:4]
+        notes = chore_data[4] if len(chore_data) > 4 else ""
+        chore = ChoreService.create(ChoreCreate(
+            name=name,
+            room_id=None,
+            interval_days=interval,
+            estimated_minutes=minutes,
+            category=category,
+            notes=notes,
+        ))
+        chore_ids[(None, name)] = chore.id
+    print(f"  Created {len(MAINTENANCE_CHORES)} maintenance chores")
 
     return chore_ids
 

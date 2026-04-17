@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS chores (
     completion_count INTEGER DEFAULT 0,
     duration_confirmed INTEGER DEFAULT 0,
     duration_confirmations INTEGER DEFAULT 0,
+    interval_confirmed INTEGER DEFAULT 0,
+    interval_confirmations INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL
 );
@@ -168,7 +170,7 @@ def set_schema_version(conn: sqlite3.Connection, version: int):
 
 
 # Current schema version
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 
 def migrate_db():
@@ -181,7 +183,14 @@ def migrate_db():
             conn.executescript(SCHEMA)
             set_schema_version(conn, 1)
 
-        # Future migrations would go here:
-        # if current_version < 2:
-        #     conn.execute("ALTER TABLE ...")
-        #     set_schema_version(conn, 2)
+        if current_version < 2:
+            # v2: interval confirmation tracking
+            try:
+                conn.execute("ALTER TABLE chores ADD COLUMN interval_confirmed INTEGER DEFAULT 0")
+            except Exception:
+                pass  # Column may already exist on fresh DBs
+            try:
+                conn.execute("ALTER TABLE chores ADD COLUMN interval_confirmations INTEGER DEFAULT 0")
+            except Exception:
+                pass
+            set_schema_version(conn, 2)

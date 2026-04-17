@@ -1,0 +1,39 @@
+add_task:
+  description: Add a task to Aether.
+  fields:
+    text:
+      description: The task text.
+      required: true
+      example: "Clean the kitchen"
+
+complete_task:
+  description: Mark a task as complete.
+  fields:
+    task_id:
+      description: The ID of the task to complete.
+      required: true
+      example: "abc123"
+
+set_energy:
+  description: Set the current energy level in Aether.
+  fields:
+    level:
+      description: "Energy level: peak, good, low, or depleted."
+      required: true
+      example: "good"
+
+what_now:
+  description: Ask Aether what to do given available time.
+  fields:
+    minutes:
+      description: How many minutes are available.
+      required: false
+      example: 20
+
+complete_chore:
+  description: Mark a chore as complete.
+  fields:
+    chore_id:
+      description: The ID of the chore to complete.
+      required: true
+      example: "abc123"

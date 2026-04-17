@@ -10,6 +10,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
+import os
+
 from aether.core import init_db, migrate_db
 from aether.api.routes import (
     rooms_router,
@@ -17,15 +19,12 @@ from aether.api.routes import (
     checklists_router,
     dashboard_router,
 )
-import os
-import aether.web as _web_module
 
 # In the container, AETHER_STATIC_DIR and AETHER_TEMPLATE_DIR are set to
-# explicit fixed paths by the Dockerfile so there is no ambiguity.
-# Locally (no env vars set) fall back to the web module's location.
-_WEB_DIR = Path(_web_module.__file__).parent
-_STATIC_DIR = Path(os.environ.get("AETHER_STATIC_DIR", _WEB_DIR / "static"))
-_TEMPLATE_DIR = Path(os.environ.get("AETHER_TEMPLATE_DIR", _WEB_DIR / "templates"))
+# explicit fixed paths by the Dockerfile. Locally, fall back relative to this file.
+_THIS_DIR = Path(__file__).parent.parent  # aether/
+_STATIC_DIR = Path(os.environ.get("AETHER_STATIC_DIR", _THIS_DIR / "web" / "static"))
+_TEMPLATE_DIR = Path(os.environ.get("AETHER_TEMPLATE_DIR", _THIS_DIR / "web" / "templates"))
 
 
 @asynccontextmanager

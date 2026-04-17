@@ -96,21 +96,24 @@ def create_app() -> FastAPI:
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-    # Serve index.html with dynamically injected ingress base path. The
-    # <base href> tag makes all relative asset URLs resolve correctly, and
-    # window.AETHER_BASE lets app.js prefix its API calls appropriately.
+    # Serve index.html, injecting the HA ingress path when available.
+    # If X-Ingress-Path is absent (direct access or header not forwarded),
+    # serve the HTML unmodified — relative asset paths resolve naturally
+    # relative to the browser's current URL, which already includes the
+    # ingress prefix. Only inject when we have a confirmed ingress path so
+    # we never accidentally set <base href="/"> and redirect assets to HA.
     @app.get("/")
     async def serve_root(request: Request):
         index_path = Path(__file__).parent.parent / "web" / "templates" / "index.html"
         if index_path.exists():
-            ingress_path = request.headers.get("x-ingress-path", "")
-            base_href = f"{ingress_path}/" if ingress_path else "/"
-            injection = (
-                f'\n  <base href="{base_href}">'
-                f'\n  <script>window.AETHER_BASE = "{ingress_path}";</script>'
-            )
             html = index_path.read_text()
-            html = html.replace("<head>", f"<head>{injection}", 1)
+            ingress_path = request.headers.get("x-ingress-path", "")
+            if ingress_path:
+                injection = (
+                    f'\n  <base href="{ingress_path}/">'
+                    f'\n  <script>window.AETHER_BASE = "{ingress_path}";</script>'
+                )
+                html = html.replace("<head>", f"<head>{injection}", 1)
             return HTMLResponse(html)
         return {"message": "Aether API is running. Web UI not found."}
 

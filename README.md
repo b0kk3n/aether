@@ -29,7 +29,21 @@ Aether lifts the mental burden of remembering what needs to be done around your 
 - **Duration estimation** — Learns accurate times from your feedback
 - **Overdue tracking** — Nothing nags, but you can see what needs attention
 
-## Quick Start
+## Home Assistant Add-on
+
+The recommended way to run Aether is as a Home Assistant add-on — it runs on
+your Pi alongside HA and is accessible anywhere via Nabu Casa.
+
+1. In HA go to **Settings → Add-ons → Add-on Store → ⋮ → Repositories**
+2. Add `https://github.com/b0kk3n/aether`
+3. Install **Aether** and click **Start**
+4. The **Aether** panel appears in the HA sidebar
+
+Optionally install the custom component from
+`homeassistant/custom_components/aether/` for HA sensors and services.
+See [DOCS.md](DOCS.md) for details.
+
+## Local / Development Quick Start
 
 ```bash
 # Install

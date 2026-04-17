@@ -17,13 +17,15 @@ from aether.api.routes import (
     checklists_router,
     dashboard_router,
 )
+import os
 import aether.web as _web_module
 
-# Locate web assets via the aether.web module's __file__ — reliable whether
-# the package is installed in site-packages or run directly from source.
+# In the container, AETHER_STATIC_DIR and AETHER_TEMPLATE_DIR are set to
+# explicit fixed paths by the Dockerfile so there is no ambiguity.
+# Locally (no env vars set) fall back to the web module's location.
 _WEB_DIR = Path(_web_module.__file__).parent
-_STATIC_DIR = _WEB_DIR / "static"
-_TEMPLATE_DIR = _WEB_DIR / "templates"
+_STATIC_DIR = Path(os.environ.get("AETHER_STATIC_DIR", _WEB_DIR / "static"))
+_TEMPLATE_DIR = Path(os.environ.get("AETHER_TEMPLATE_DIR", _WEB_DIR / "templates"))
 
 
 @asynccontextmanager

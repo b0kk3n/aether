@@ -13,6 +13,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import os
 
 from aether.core import init_db, migrate_db
+from aether.core.services.room_service import RoomService
+from aether.seed.seeder import seed_database
 from aether.api.routes import (
     rooms_router,
     chores_router,
@@ -32,6 +34,8 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     init_db()
     migrate_db()
+    if not RoomService.get_all():
+        seed_database()
     yield
 
 
@@ -55,7 +59,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Aether",
         description="Home Concierge - Your home, managed. Your mind, free.",
-        version="0.3.3",
+        version="0.3.4",
         lifespan=lifespan,
     )
 
@@ -77,7 +81,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health_check():
-        return {"status": "ok", "version": "0.3.3"}
+        return {"status": "ok", "version": "0.3.4"}
 
     # Dynamic PWA manifest — patches start_url and icon paths for ingress.
     # Must be registered BEFORE app.mount("/static", ...) so this route wins.

@@ -1,17 +1,19 @@
-#!/usr/bin/with-contenv bashio
+#!/bin/bash
+set -e
 
-LOG_LEVEL=$(bashio::config 'log_level')
-INGRESS_PORT=$(bashio::addon.ingress_port)
-
-bashio::log.info "Starting Aether on port ${INGRESS_PORT}"
-bashio::log.info "Log level: ${LOG_LEVEL}"
-
-export AETHER_LOG_LEVEL="${LOG_LEVEL}"
-export AETHER_INGRESS_PORT="${INGRESS_PORT}"
+# Read log_level from /data/options.json (written by the HA supervisor from
+# the user's add-on config). Falls back to "info" if the file is absent.
+LOG_LEVEL=$(python3 -c "
+import json
+try:
+    print(json.load(open('/data/options.json')).get('log_level', 'info'))
+except Exception:
+    print('info')
+")
 
 exec uvicorn \
     aether.api.app:app \
     --host 0.0.0.0 \
-    --port "${INGRESS_PORT}" \
+    --port 8099 \
     --log-level "${LOG_LEVEL}" \
     --no-access-log

@@ -1,23 +1,19 @@
-ARG BUILD_FROM
-FROM $BUILD_FROM
+FROM python:3.11-slim
 
-# Install system build dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    musl-dev \
-    libffi-dev \
-    python3-dev
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install Python dependencies via requirements.txt rather than pyproject.toml.
-# This uses plain uvicorn (no [standard] extras) so the image builds on
-# armv7 (RPi 3), where uvloop — included in uvicorn[standard] — is unavailable.
+# Use requirements.txt instead of pyproject.toml so we can install plain
+# uvicorn (no [standard] extras), keeping the image buildable on armv7 where
+# uvloop is unavailable.
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# Copy application source — accessible here because the repo root is the
-# Docker build context (config.yaml lives at the root, not in a subfolder).
+# Full source is accessible here because config.yaml lives at the repo root,
+# making the entire repo the Docker build context.
 COPY aether/ ./aether/
 
 # /data is mapped to persistent storage by the HA supervisor

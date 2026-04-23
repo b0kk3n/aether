@@ -17,6 +17,7 @@ let currentRoomId = null;
 let currentChecklistId = null;
 let _editingChore = null; // Chore currently open in the edit form
 let _currentChecklistChoreIds = new Set(); // IDs of chores in the open checklist
+let _currentChecklist = null; // Checklist currently open in the detail view
 
 // DOM Elements
 const appContent = document.getElementById('app-content');
@@ -624,6 +625,7 @@ async function loadChecklistDetail(checklistId) {
 }
 
 function renderChecklistDetail(checklist) {
+  _currentChecklist = checklist;
   // Track which chores are already in this checklist (for the adder picker)
   _currentChecklistChoreIds = new Set(checklist.chores.map(c => c.id));
 
@@ -636,7 +638,7 @@ function renderChecklistDetail(checklist) {
         Checklists
       </a>
       <div style="display:flex;gap:var(--space-sm)">
-        <button class="icon-btn" onclick="showEditChecklistForm(${JSON.stringify(checklist)})" title="Edit checklist">
+        <button class="icon-btn" onclick="showEditChecklistForm(_currentChecklist)" title="Edit checklist">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -648,7 +650,7 @@ function renderChecklistDetail(checklist) {
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
-        <button class="icon-btn" onclick="deleteChecklist('${checklist.id}', ${JSON.stringify(checklist.name)})" title="Delete checklist" style="color:var(--overdue)">
+        <button class="icon-btn" onclick="deleteChecklist(_currentChecklist.id, _currentChecklist.name)" title="Delete checklist" style="color:var(--overdue)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>

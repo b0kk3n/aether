@@ -170,8 +170,8 @@ class Chore(ChoreBase):
     def freshness_percent(self) -> int:
         """How fresh is this chore (100 = just done/new, 0 = overdue).
 
-        Stays at 100% for the first 75% of the interval, then decays linearly
-        to 0% over the final 25%. Uses created_at as the reference point for
+        Stays at 100% for the first 50% of the interval, then decays linearly
+        to 0% over the final 50%. Uses created_at as the reference point for
         chores that have never been completed.
         """
         reference = self.last_completed_at or self.created_at
@@ -183,7 +183,7 @@ class Chore(ChoreBase):
             return 0
 
         days_until = self.interval_days - days_since
-        decay_window = self.interval_days * 0.25
+        decay_window = self.interval_days * 0.5
 
         if days_until > decay_window:
             return 100

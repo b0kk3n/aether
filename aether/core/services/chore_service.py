@@ -208,9 +208,7 @@ class ChoreService:
                 SELECT * FROM chores
                 WHERE room_id = ? AND is_active = 1
                 ORDER BY
-                    CASE WHEN last_completed_at IS NULL THEN 0
-                         ELSE julianday(last_completed_at) + interval_days - julianday('now')
-                    END,
+                    julianday(COALESCE(last_completed_at, created_at)) + interval_days - julianday('now'),
                     interval_days
                 """,
                 (room_id,),
@@ -227,9 +225,7 @@ class ChoreService:
                 SELECT * FROM chores
                 WHERE room_id IS NULL AND is_active = 1
                 ORDER BY
-                    CASE WHEN last_completed_at IS NULL THEN 0
-                         ELSE julianday(last_completed_at) + interval_days - julianday('now')
-                    END,
+                    julianday(COALESCE(last_completed_at, created_at)) + interval_days - julianday('now'),
                     interval_days
                 """
             ).fetchall()
@@ -246,14 +242,9 @@ class ChoreService:
                 FROM chores c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
-                AND (
-                    c.last_completed_at IS NULL
-                    OR julianday('now') - julianday(c.last_completed_at) > c.interval_days
-                )
+                AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days
                 ORDER BY
-                    CASE WHEN c.last_completed_at IS NULL THEN 999
-                         ELSE julianday('now') - julianday(c.last_completed_at) - c.interval_days
-                    END DESC
+                    julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) - c.interval_days DESC
                 """
             ).fetchall()
 
@@ -269,10 +260,9 @@ class ChoreService:
                 FROM chores c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
-                AND c.last_completed_at IS NOT NULL
-                AND julianday(c.last_completed_at) + c.interval_days - julianday('now') <= ?
-                AND julianday(c.last_completed_at) + c.interval_days - julianday('now') > 0
-                ORDER BY julianday(c.last_completed_at) + c.interval_days
+                AND julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days - julianday('now') <= ?
+                AND julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days - julianday('now') > 0
+                ORDER BY julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days
                 """,
                 (days,),
             ).fetchall()

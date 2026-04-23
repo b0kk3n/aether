@@ -112,20 +112,19 @@ class RoomService:
                         COUNT(*) as chore_count,
                         AVG(
                             CASE
-                                WHEN last_completed_at IS NULL THEN 0
-                                WHEN julianday('now') - julianday(last_completed_at) >= interval_days THEN 0
-                                WHEN interval_days - (julianday('now') - julianday(last_completed_at)) <= 3
-                                    THEN MAX(
-                                        100 - ((julianday('now') - julianday(last_completed_at)) / interval_days * 100),
-                                        50
-                                    )
-                                ELSE 100 - ((julianday('now') - julianday(last_completed_at)) / interval_days * 100)
+                                WHEN interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) <= 0
+                                    THEN 0
+                                WHEN interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) > 0.25 * interval_days
+                                    THEN 100
+                                ELSE CAST(
+                                    ((interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at)))) / (0.25 * interval_days)) * 100
+                                    AS INTEGER
+                                )
                             END
                         ) as avg_freshness,
                         SUM(
                             CASE
-                                WHEN last_completed_at IS NULL THEN 1
-                                WHEN julianday('now') - julianday(last_completed_at) > interval_days THEN 1
+                                WHEN julianday('now') - julianday(COALESCE(last_completed_at, created_at)) > interval_days THEN 1
                                 ELSE 0
                             END
                         ) as overdue_count

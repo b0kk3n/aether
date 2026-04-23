@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Fix checklist edit button (JSON in onclick attribute broke the HTML parser; now uses a module-level reference)
+- Tune freshness decay threshold from 75% to 50% — rooms felt too positive; a task due tomorrow now correctly shows urgency while long-interval tasks with plenty of time remaining still read as 100%
+
 ## 0.4.0
 
 ### Checklist improvements

@@ -114,10 +114,10 @@ class RoomService:
                             CASE
                                 WHEN interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) <= 0
                                     THEN 0
-                                WHEN interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) > 0.25 * interval_days
+                                WHEN interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) > 0.5 * interval_days
                                     THEN 100
                                 ELSE CAST(
-                                    ((interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at)))) / (0.25 * interval_days)) * 100
+                                    ((interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at)))) / (0.5 * interval_days)) * 100
                                     AS INTEGER
                                 )
                             END

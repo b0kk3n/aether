@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+### Checklist improvements
+- Edit checklist name, description, and icon directly from the detail view
+- Delete checklists with a single tap (with confirmation)
+- Checklist items now sorted by due date ascending — most urgent tasks always appear first, regardless of completion status
+- Checklist list cards now show overdue count and total estimated time at a glance
+
+### Freshness scoring overhaul
+- Freshness stays at 100% for the first 75% of an interval, then decays linearly to 0% over the final 25% — a task due in 84 days on a 90-day interval now correctly reads as fully fresh
+- Removed the 50% artificial floor that was propping up scores for tasks due within 3 days, which masked urgency rather than showing it
+- Newly added chores start at 100% fresh and decay from their creation date instead of being immediately overdue; all SQL queries updated consistently with `COALESCE(last_completed_at, created_at)`
+
 ## 0.3.1
 
 - Fix `ModuleNotFoundError: No module named 'aether.core.engine'` crash on startup

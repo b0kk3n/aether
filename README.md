@@ -16,11 +16,11 @@ Aether lifts the mental burden of remembering what needs to be done around your 
 
 ### Core
 
-- **77 chores** organized by room with smart intervals
-- **Freshness scores** — See room status at a glance
+- **80 chores** organized by room with smart intervals
+- **Freshness scores** — Room health at a glance; stays green while you have plenty of time, decays only in the final stretch before a task is due
 - **"I have X minutes"** — Get prioritized tasks that fit your time
 - **Morning briefing** — ~15 min of high-impact suggestions
-- **Checklists** — Scenarios like "Parents visiting" or "Sleepover"
+- **Checklists** — Scenarios like "Parents visiting" or "Sleepover"; create, edit, and delete them; items sorted by due date so the most urgent always floats to the top; at-a-glance overdue count and estimated time on the list view
 
 ### Smart
 
@@ -28,6 +28,7 @@ Aether lifts the mental burden of remembering what needs to be done around your 
 - **Streak tracking** — Gamified consistency
 - **Duration estimation** — Learns accurate times from your feedback
 - **Overdue tracking** — Nothing nags, but you can see what needs attention
+- **Graceful new-chore handling** — Freshly added tasks start at 100% fresh and decay from their creation date, not from zero
 
 ## Home Assistant Add-on
 
@@ -82,8 +83,11 @@ All endpoints available at `/api`:
 - `GET /api/rooms/{id}/chores` — Chores for a room
 - `GET /api/chores` — List all chores
 - `POST /api/chores/{id}/complete` — Mark complete
-- `GET /api/checklists` — List checklists
-- `GET /api/checklists/{id}` — Checklist with live status
+- `GET /api/checklists` — List checklists with overdue count and estimated time
+- `GET /api/checklists/{id}` — Checklist with live chore status, sorted by due date
+- `POST /api/checklists` — Create checklist
+- `PUT /api/checklists/{id}` — Update checklist name, description, or icon
+- `DELETE /api/checklists/{id}` — Delete checklist
 
 ## Tech Stack
 

@@ -92,10 +92,26 @@ class ChecklistService:
 
     @staticmethod
     def get_all() -> list[Checklist]:
-        """Get all checklists."""
+        """Get all checklists with summary stats."""
         with get_db() as conn:
             rows = conn.execute(
-                "SELECT * FROM checklists ORDER BY name"
+                """
+                SELECT
+                    cl.id, cl.name, cl.description, cl.icon, cl.created_at,
+                    COALESCE(SUM(c.estimated_minutes), 0) as total_minutes,
+                    SUM(
+                        CASE
+                            WHEN c.id IS NOT NULL
+                            AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days
+                            THEN 1 ELSE 0
+                        END
+                    ) as overdue_count
+                FROM checklists cl
+                LEFT JOIN checklist_chores cc ON cl.id = cc.checklist_id
+                LEFT JOIN chores c ON cc.chore_id = c.id AND c.is_active = 1
+                GROUP BY cl.id
+                ORDER BY cl.name
+                """
             ).fetchall()
 
         return [
@@ -105,6 +121,8 @@ class ChecklistService:
                 description=row["description"] or "",
                 icon=row["icon"],
                 created_at=datetime.fromisoformat(row["created_at"]),
+                total_minutes=row["total_minutes"] or 0,
+                overdue_count=row["overdue_count"] or 0,
             )
             for row in rows
         ]

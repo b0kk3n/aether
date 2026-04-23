@@ -153,9 +153,8 @@ class Chore(ChoreBase):
     @property
     def due_date(self) -> datetime:
         """When this chore is due."""
-        if not self.last_completed_at:
-            return datetime.now()  # Never done = due now
-        return self.last_completed_at + timedelta(days=self.interval_days)
+        reference = self.last_completed_at or self.created_at
+        return reference + timedelta(days=self.interval_days)
 
     @property
     def days_until_due(self) -> int:
@@ -169,27 +168,27 @@ class Chore(ChoreBase):
 
     @property
     def freshness_percent(self) -> int:
-        """How fresh is this chore (100 = just done, 0 = due/overdue).
+        """How fresh is this chore (100 = just done/new, 0 = overdue).
 
-        Calculated as percentage of interval remaining.
-        Overdue chores score 0%. Chores due within 3 days score at least 50%
-        to avoid an overly negative view when nothing urgent needs doing.
+        Stays at 100% for the first 75% of the interval, then decays linearly
+        to 0% over the final 25%. Uses created_at as the reference point for
+        chores that have never been completed.
         """
-        if not self.last_completed_at:
-            return 0
-
-        days_since = (datetime.now() - self.last_completed_at).days
+        reference = self.last_completed_at or self.created_at
+        days_since = (datetime.now() - reference).days
 
         if days_since <= 0:
             return 100
-        elif days_since >= self.interval_days:
+        if days_since >= self.interval_days:
             return 0
-        else:
-            actual = int(100 - (days_since / self.interval_days * 100))
-            days_until = self.interval_days - days_since
-            if days_until <= 3:
-                return max(actual, 50)
-            return actual
+
+        days_until = self.interval_days - days_since
+        decay_window = self.interval_days * 0.25
+
+        if days_until > decay_window:
+            return 100
+
+        return int((days_until / decay_window) * 100)
 
     @property
     def urgency_score(self) -> float:
@@ -275,6 +274,8 @@ class ChecklistBase(BaseModel):
     name: str
     description: str = ""
     icon: str = "📋"
+    overdue_count: int = 0
+    total_minutes: int = 0
 
 
 class ChecklistCreate(ChecklistBase):
@@ -306,8 +307,6 @@ class Checklist(ChecklistBase):
 class ChecklistWithChores(Checklist):
     """Checklist with live chore status."""
     chores: list[ChoreStatus] = []
-    total_minutes: int = 0  # Estimated time to complete all
-    overdue_count: int = 0
 
 
 # =============================================================================

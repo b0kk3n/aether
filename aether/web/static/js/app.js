@@ -588,13 +588,18 @@ function renderListsView(lists) {
       </button>
     </div>
 
-    ${lists.length > 0 ? lists.map(list => `
+    ${lists.length > 0 ? lists.map(list => {
+      const statParts = [];
+      if (list.overdue_count > 0) statParts.push(`${list.overdue_count} need attention`);
+      if (list.total_minutes > 0) statParts.push(`~${list.total_minutes} min`);
+      return `
       <a href="#" class="card" style="display: block; margin-bottom: var(--space-md); text-decoration: none; color: inherit;"
          onclick="loadChecklistDetail('${list.id}'); return false;">
         <div class="title">${list.icon} ${list.name}</div>
-        <div class="caption mt-sm">${list.description}</div>
+        ${list.description ? `<div class="caption mt-sm">${list.description}</div>` : ''}
+        ${statParts.length > 0 ? `<div class="caption mt-sm" style="color:var(--text-tertiary)">${statParts.join(' · ')}</div>` : ''}
       </a>
-    `).join('') : `
+    `}).join('') : `
       <div class="empty-state">
         <div class="empty-state-icon">&#128203;</div>
         <div class="empty-state-text">No checklists yet</div>
@@ -630,12 +635,29 @@ function renderChecklistDetail(checklist) {
         </svg>
         Checklists
       </a>
-      <button class="icon-btn" onclick="openChecklistChoreAdder()" title="Add chore">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-      </button>
+      <div style="display:flex;gap:var(--space-sm)">
+        <button class="icon-btn" onclick="showEditChecklistForm(${JSON.stringify(checklist)})" title="Edit checklist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="openChecklistChoreAdder()" title="Add chore">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="deleteChecklist('${checklist.id}', ${JSON.stringify(checklist.name)})" title="Delete checklist" style="color:var(--overdue)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+            <path d="M9 6V4h6v2"></path>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div class="checklist-header">
@@ -653,11 +675,7 @@ function renderChecklistDetail(checklist) {
           <div class="empty-state-icon">+</div>
           <div class="empty-state-text">Tap + to add chores</div>
         </div>
-      ` : [...checklist.chores].sort((a, b) => {
-        const aDone = !a.is_overdue && a.days_until_due > 0;
-        const bDone = !b.is_overdue && b.days_until_due > 0;
-        return aDone === bDone ? 0 : aDone ? 1 : -1;
-      }).map(chore => {
+      ` : [...checklist.chores].sort((a, b) => a.days_until_due - b.days_until_due).map(chore => {
         const isDone = !chore.is_overdue && chore.days_until_due > 0;
         return `
           <div class="checklist-item ${isDone ? 'done' : ''}" data-chore-id="${chore.id}">
@@ -1320,6 +1338,98 @@ function dismissChecklistForm() {
   overlay.classList.remove('visible');
   sheet.classList.remove('visible');
   setTimeout(() => { overlay.remove(); sheet.remove(); }, 300);
+}
+
+// Edit Checklist
+
+function showEditChecklistForm(checklist) {
+  _selectedChecklistIcon = checklist.icon || '📋';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'checklist-form-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet chore-form-sheet';
+  sheet.id = 'checklist-form-sheet';
+
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Edit checklist</div>
+
+    <div class="form-group">
+      <label class="form-label">Icon</label>
+      <div class="icon-picker">
+        ${CHECKLIST_ICONS.map(icon => `
+          <button class="icon-picker-btn ${icon === _selectedChecklistIcon ? 'selected' : ''}"
+            onclick="selectChecklistIcon('${icon}')">${icon}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input type="text" id="checklist-form-name" class="form-input"
+        value="${checklist.name.replace(/"/g, '&quot;')}"
+        autocomplete="off" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description <span style="color:var(--text-tertiary);font-size:var(--font-size-caption);">(optional)</span></label>
+      <input type="text" id="checklist-form-desc" class="form-input"
+        value="${(checklist.description || '').replace(/"/g, '&quot;')}"
+        autocomplete="off" />
+    </div>
+
+    <div class="modal-buttons" style="margin-top: var(--space-lg);">
+      <button class="modal-btn modal-btn-primary" onclick="submitEditChecklist('${checklist.id}')">Save</button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissChecklistForm()">Cancel</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+  overlay.addEventListener('click', dismissChecklistForm);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+    const nameInput = document.getElementById('checklist-form-name');
+    if (nameInput) nameInput.focus();
+  });
+}
+
+async function submitEditChecklist(checklistId) {
+  const name = document.getElementById('checklist-form-name')?.value?.trim();
+  const description = document.getElementById('checklist-form-desc')?.value?.trim() || '';
+
+  if (!name) {
+    const nameInput = document.getElementById('checklist-form-name');
+    if (nameInput) { nameInput.focus(); nameInput.style.borderColor = 'var(--overdue)'; }
+    return;
+  }
+
+  try {
+    await api(`/checklists/${checklistId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, description, icon: _selectedChecklistIcon }),
+    });
+    dismissChecklistForm();
+    loadChecklistDetail(checklistId);
+  } catch (err) {
+    console.error('Failed to update checklist:', err);
+  }
+}
+
+async function deleteChecklist(checklistId, checklistName) {
+  if (!confirm(`Delete "${checklistName}"? This cannot be undone.`)) return;
+
+  try {
+    await api(`/checklists/${checklistId}`, { method: 'DELETE' });
+    loadListsView();
+  } catch (err) {
+    console.error('Failed to delete checklist:', err);
+  }
 }
 
 // Chore Management (Create / Edit / Delete)

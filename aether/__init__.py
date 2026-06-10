@@ -3,7 +3,7 @@
 Your home, managed. Your mind, free.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.1"
 
 from .core import (
     # Models

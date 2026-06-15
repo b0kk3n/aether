@@ -105,7 +105,14 @@ class ChecklistService:
                             AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days
                             THEN 1 ELSE 0
                         END
-                    ) as overdue_count
+                    ) as overdue_count,
+                    COALESCE(SUM(
+                        CASE
+                            WHEN c.id IS NOT NULL
+                            AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days
+                            THEN c.estimated_minutes ELSE 0
+                        END
+                    ), 0) as remaining_minutes
                 FROM checklists cl
                 LEFT JOIN checklist_chores cc ON cl.id = cc.checklist_id
                 LEFT JOIN chores c ON cc.chore_id = c.id AND c.is_active = 1
@@ -123,6 +130,7 @@ class ChecklistService:
                 created_at=datetime.fromisoformat(row["created_at"]),
                 total_minutes=row["total_minutes"] or 0,
                 overdue_count=row["overdue_count"] or 0,
+                remaining_minutes=row["remaining_minutes"] or 0,
             )
             for row in rows
         ]
@@ -154,12 +162,15 @@ class ChecklistService:
 
         chores = []
         total_minutes = 0
+        remaining_minutes = 0
         overdue_count = 0
 
         for row in rows:
             chore = ChoreService._row_to_chore_status(row, row["room_name"])
             chores.append(chore)
             total_minutes += chore.estimated_minutes
+            if chore.is_overdue or chore.days_until_due <= 0:
+                remaining_minutes += chore.estimated_minutes
             if chore.is_overdue:
                 overdue_count += 1
 
@@ -171,6 +182,7 @@ class ChecklistService:
             created_at=checklist.created_at,
             chores=chores,
             total_minutes=total_minutes,
+            remaining_minutes=remaining_minutes,
             overdue_count=overdue_count,
         )
 

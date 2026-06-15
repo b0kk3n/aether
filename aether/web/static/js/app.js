@@ -592,7 +592,7 @@ function renderListsView(lists) {
     ${lists.length > 0 ? lists.map(list => {
       const statParts = [];
       if (list.overdue_count > 0) statParts.push(`${list.overdue_count} need attention`);
-      if (list.total_minutes > 0) statParts.push(`~${list.total_minutes} min`);
+      if (list.remaining_minutes > 0) statParts.push(`~${list.remaining_minutes} min to complete`);
       return `
       <a href="#" class="card" style="display: block; margin-bottom: var(--space-md); text-decoration: none; color: inherit;"
          onclick="loadChecklistDetail('${list.id}'); return false;">
@@ -666,7 +666,7 @@ function renderChecklistDetail(checklist) {
       <div class="title">${checklist.icon} ${checklist.name}</div>
       <div class="caption">${checklist.description}</div>
       <div class="checklist-meta">
-        <span>~${checklist.total_minutes} min</span>
+        <span>~${checklist.remaining_minutes} min to complete</span>
         <span>${checklist.overdue_count} need attention</span>
       </div>
     </div>
@@ -795,17 +795,6 @@ async function completeChore(choreId) {
     } else {
       refreshView();
     }
-
-    // Show at most one confirmation modal per completion (duration takes priority)
-    if (result && result.ask_about_duration) {
-      setTimeout(() => {
-        showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes);
-      }, 400);
-    } else if (result && result.ask_about_interval) {
-      setTimeout(() => {
-        showIntervalConfirmation(choreId, result.chore.name, result.chore.interval_days);
-      }, 400);
-    }
   } catch (err) {
     console.error('Failed to complete chore:', err);
   }
@@ -884,13 +873,6 @@ async function completeChoreWithAnimation(container, choreId) {
       } else {
         afterConfirmation();
       }
-
-      // Show at most one confirmation modal per completion (duration takes priority)
-      if (result.ask_about_duration) {
-        showDurationConfirmation(choreId, result.chore.name, result.chore.estimated_minutes);
-      } else if (result.ask_about_interval) {
-        showIntervalConfirmation(choreId, result.chore.name, result.chore.interval_days);
-      }
     }, 400);
 
   } catch (err) {
@@ -901,7 +883,11 @@ async function completeChoreWithAnimation(container, choreId) {
 }
 
 // Duration Confirmation Modal
-function showDurationConfirmation(choreId, choreName, estimatedMinutes) {
+let _durationOnDone = null;
+let _intervalOnDone = null;
+
+function showDurationConfirmation(choreId, choreName, estimatedMinutes, onDone) {
+  _durationOnDone = onDone || null;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'duration-modal-overlay';
@@ -1016,6 +1002,11 @@ function dismissDurationModal() {
   setTimeout(() => {
     overlay.remove();
     sheet.remove();
+    if (_durationOnDone) {
+      const cb = _durationOnDone;
+      _durationOnDone = null;
+      cb();
+    }
   }, 300);
 }
 
@@ -1029,7 +1020,10 @@ function formatInterval(days) {
   return `every ${days} days`;
 }
 
-function showIntervalConfirmation(choreId, choreName, intervalDays) {
+function showIntervalConfirmation(choreId, choreName, intervalDays, suggestedDays, context, onDone) {
+  _intervalOnDone = onDone || null;
+  const prefill = suggestedDays || intervalDays;
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'interval-modal-overlay';
@@ -1040,12 +1034,12 @@ function showIntervalConfirmation(choreId, choreName, intervalDays) {
   sheet.innerHTML = `
     <div class="modal-handle"></div>
     <div class="modal-title">Right schedule?</div>
-    <div class="modal-subtitle">${choreName} is set to ${formatInterval(intervalDays)}.</div>
+    <div class="modal-subtitle">${choreName} is set to ${formatInterval(intervalDays)}.${context ? ` Done ${context}.` : ''}</div>
     <div class="modal-buttons">
       <button class="modal-btn modal-btn-primary" onclick="confirmInterval('${choreId}', true)">
         Yes, that's right
       </button>
-      <button class="modal-btn modal-btn-secondary" onclick="showIntervalAdjust('${choreId}', ${intervalDays})">
+      <button class="modal-btn modal-btn-secondary" onclick="showIntervalAdjust('${choreId}', ${prefill})">
         No, change the schedule
       </button>
       <button class="modal-btn modal-btn-tertiary" onclick="dismissIntervalModal()">
@@ -1148,6 +1142,11 @@ function dismissIntervalModal() {
   setTimeout(() => {
     overlay.remove();
     sheet.remove();
+    if (_intervalOnDone) {
+      const cb = _intervalOnDone;
+      _intervalOnDone = null;
+      cb();
+    }
   }, 300);
 }
 

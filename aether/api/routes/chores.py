@@ -43,6 +43,8 @@ class CompleteResponse(BaseModel):
     ask_about_duration: bool
     ask_about_interval: bool
     message: str
+    suggested_interval: Optional[int] = None
+    interval_context: Optional[str] = None
 
 
 @router.get("", response_model=list[ChoreWithRoom])
@@ -147,10 +149,9 @@ def complete_chore(chore_id: str, request: CompleteRequest = CompleteRequest()):
         days_since = (datetime.now() - chore.last_completed_at).days
         deviation = days_since - chore.interval_days
 
-        # Only ask if deviation is significant:
-        # - More than 2 days off (not just minor life variance)
-        # - More than 25% of the interval (proportionally significant)
-        min_deviation = max(3, int(chore.interval_days * 0.25))
+        # Only ask if completion is very much out of sync:
+        # - At least a week off, or 50% of the interval (whichever is greater)
+        min_deviation = max(7, int(chore.interval_days * 0.5))
 
         if abs(deviation) >= min_deviation:
             ask_about_interval = True
@@ -180,6 +181,8 @@ def complete_chore(chore_id: str, request: CompleteRequest = CompleteRequest()):
         ask_about_duration=ask_about_duration and request.duration_was_accurate is None,
         ask_about_interval=ask_about_interval,
         message=message,
+        suggested_interval=suggested_interval,
+        interval_context=interval_context,
     )
 
 

@@ -443,8 +443,8 @@ class ChoreService:
         if chore.duration_confirmed:
             return False
 
-        # Ask every other time until confirmed
-        return chore.completion_count % 2 == 1
+        # Ask every 3rd completion until confirmed
+        return chore.completion_count % 3 == 2
 
     @staticmethod
     def should_ask_interval(chore_id: str) -> bool:

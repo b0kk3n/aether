@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2
+
+### Checklist time-to-complete and smarter check questions
+
+- Checklist now shows time to complete (remaining chores only) instead of total time
+- Duration check question asked every 3rd completion instead of every 2nd
+- Interval check question only triggers when completion is 50%+ or 7+ days off schedule
+- Fixed duplicate modal bug causing 'No' responses to not always save
+
 ## 0.4.1
 
 - Fix checklist edit button (JSON in onclick attribute broke the HTML parser; now uses a module-level reference)

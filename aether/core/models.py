@@ -276,6 +276,7 @@ class ChecklistBase(BaseModel):
     icon: str = "📋"
     overdue_count: int = 0
     total_minutes: int = 0
+    remaining_minutes: int = 0
 
 
 class ChecklistCreate(ChecklistBase):

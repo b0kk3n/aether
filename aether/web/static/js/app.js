@@ -592,7 +592,7 @@ function renderListsView(lists) {
     ${lists.length > 0 ? lists.map(list => {
       const statParts = [];
       if (list.overdue_count > 0) statParts.push(`${list.overdue_count} need attention`);
-      if (list.total_minutes > 0) statParts.push(`~${list.total_minutes} min`);
+      if (list.remaining_minutes > 0) statParts.push(`~${list.remaining_minutes} min to complete`);
       return `
       <a href="#" class="card" style="display: block; margin-bottom: var(--space-md); text-decoration: none; color: inherit;"
          onclick="loadChecklistDetail('${list.id}'); return false;">
@@ -666,7 +666,7 @@ function renderChecklistDetail(checklist) {
       <div class="title">${checklist.icon} ${checklist.name}</div>
       <div class="caption">${checklist.description}</div>
       <div class="checklist-meta">
-        <span>~${checklist.total_minutes} min</span>
+        <span>~${checklist.remaining_minutes} min to complete</span>
         <span>${checklist.overdue_count} need attention</span>
       </div>
     </div>

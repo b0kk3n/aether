@@ -276,5 +276,51 @@ def checklist(checklist_id: str):
     console.print(table)
 
 
+@main.group()
+def vacation():
+    """Manage vacation mode."""
+    pass
+
+
+@vacation.command("start")
+def vacation_start():
+    """Start vacation mode, pausing eligible chores' countdowns."""
+    from aether.core import VacationService
+
+    try:
+        VacationService.start()
+        console.print("[green]Vacation mode started.[/green] Eligible chores are now paused.")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+
+
+@vacation.command("end")
+def vacation_end():
+    """End vacation mode, shifting eligible chores' due dates forward."""
+    from aether.core import VacationService
+
+    try:
+        result = VacationService.end()
+        days = round(result.days_elapsed, 1)
+        console.print(
+            f"[green]Welcome back![/green] {result.chores_affected} chore(s) shifted forward by ~{days} day(s)."
+        )
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+
+
+@vacation.command("status")
+def vacation_status():
+    """Show current vacation mode status."""
+    from aether.core import VacationService
+
+    status = VacationService.get_status()
+    if status.is_active:
+        days = round(status.days_elapsed, 1)
+        console.print(f"[green]Vacation mode is active[/green] — {days} day(s) so far.")
+    else:
+        console.print("[dim]Vacation mode is not active.[/dim]")
+
+
 if __name__ == "__main__":
     main()

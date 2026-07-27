@@ -15,6 +15,8 @@ from aether.core.models import (
     Room,
     Category,
     Priority,
+    VacationOverride,
+    is_vacation_eligible,
     priority_from_interval,
     generate_id,
 )
@@ -43,6 +45,8 @@ class ChoreService:
             duration_confirmations=row["duration_confirmations"],
             interval_confirmed=bool(row["interval_confirmed"]) if row["interval_confirmed"] is not None else False,
             interval_confirmations=row["interval_confirmations"] if row["interval_confirmations"] is not None else 0,
+            vacation_override=VacationOverride(row["vacation_override"]) if row["vacation_override"] else None,
+            vacation_paused_days=row["effective_paused_days"] if row["effective_paused_days"] is not None else 0.0,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
@@ -62,6 +66,7 @@ class ChoreService:
             last_completed_at=chore.last_completed_at,
             estimated_minutes=chore.estimated_minutes,
             streak=chore.streak,
+            vacation_eligible=chore.vacation_eligible,
         )
 
     @staticmethod
@@ -75,9 +80,9 @@ class ChoreService:
                 """
                 INSERT INTO chores (
                     id, name, room_id, interval_days, estimated_minutes,
-                    category, notes, is_active, created_at
+                    category, notes, is_active, vacation_override, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     chore_id,
@@ -88,6 +93,7 @@ class ChoreService:
                     chore.category.value,
                     chore.notes,
                     1 if chore.is_active else 0,
+                    chore.vacation_override.value if chore.vacation_override else None,
                     now,
                 ),
             )
@@ -99,7 +105,7 @@ class ChoreService:
         """Get a chore by ID."""
         with get_db() as conn:
             row = conn.execute(
-                "SELECT * FROM chores WHERE id = ?", (chore_id,)
+                "SELECT * FROM chores_effective WHERE id = ?", (chore_id,)
             ).fetchone()
 
         if not row:
@@ -113,12 +119,12 @@ class ChoreService:
         with get_db() as conn:
             if room_id:
                 row = conn.execute(
-                    "SELECT * FROM chores WHERE name = ? AND room_id = ?",
+                    "SELECT * FROM chores_effective WHERE name = ? AND room_id = ?",
                     (name, room_id),
                 ).fetchone()
             else:
                 row = conn.execute(
-                    "SELECT * FROM chores WHERE name = ? AND room_id IS NULL",
+                    "SELECT * FROM chores_effective WHERE name = ? AND room_id IS NULL",
                     (name,),
                 ).fetchone()
 
@@ -156,7 +162,7 @@ class ChoreService:
 
         with get_db() as conn:
             rows = conn.execute(
-                f"SELECT * FROM chores WHERE {where_clause} ORDER BY interval_days, name",
+                f"SELECT * FROM chores_effective WHERE {where_clause} ORDER BY interval_days, name",
                 params,
             ).fetchall()
 
@@ -170,7 +176,7 @@ class ChoreService:
                 """
                 SELECT c.*, r.id as r_id, r.name as r_name, r.icon as r_icon,
                        r.sort_order as r_sort_order, r.created_at as r_created_at
-                FROM chores c
+                FROM chores_effective c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
                 ORDER BY c.interval_days, c.name
@@ -205,10 +211,10 @@ class ChoreService:
 
             rows = conn.execute(
                 """
-                SELECT * FROM chores
+                SELECT * FROM chores_effective
                 WHERE room_id = ? AND is_active = 1
                 ORDER BY
-                    julianday(COALESCE(last_completed_at, created_at)) + interval_days - julianday('now'),
+                    julianday(COALESCE(last_completed_at, created_at)) + interval_days + effective_paused_days - julianday('now'),
                     interval_days
                 """,
                 (room_id,),
@@ -222,10 +228,10 @@ class ChoreService:
         with get_db() as conn:
             rows = conn.execute(
                 """
-                SELECT * FROM chores
+                SELECT * FROM chores_effective
                 WHERE room_id IS NULL AND is_active = 1
                 ORDER BY
-                    julianday(COALESCE(last_completed_at, created_at)) + interval_days - julianday('now'),
+                    julianday(COALESCE(last_completed_at, created_at)) + interval_days + effective_paused_days - julianday('now'),
                     interval_days
                 """
             ).fetchall()
@@ -239,12 +245,12 @@ class ChoreService:
             rows = conn.execute(
                 """
                 SELECT c.*, r.name as room_name
-                FROM chores c
+                FROM chores_effective c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
-                AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days
+                AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days + c.effective_paused_days
                 ORDER BY
-                    julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) - c.interval_days DESC
+                    julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) - c.interval_days - c.effective_paused_days DESC
                 """
             ).fetchall()
 
@@ -257,12 +263,12 @@ class ChoreService:
             rows = conn.execute(
                 """
                 SELECT c.*, r.name as room_name
-                FROM chores c
+                FROM chores_effective c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
-                AND julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days - julianday('now') <= ?
-                AND julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days - julianday('now') > 0
-                ORDER BY julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days
+                AND julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days + c.effective_paused_days - julianday('now') <= ?
+                AND julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days + c.effective_paused_days - julianday('now') > 0
+                ORDER BY julianday(COALESCE(c.last_completed_at, c.created_at)) + c.interval_days + c.effective_paused_days
                 """,
                 (days,),
             ).fetchall()
@@ -306,6 +312,9 @@ class ChoreService:
         if update.is_active is not None:
             updates.append("is_active = ?")
             params.append(1 if update.is_active else 0)
+        if "vacation_override" in update.model_fields_set:
+            updates.append("vacation_override = ?")
+            params.append(update.vacation_override.value if update.vacation_override else None)
 
         if updates:
             params.append(chore_id)

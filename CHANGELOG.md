@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+### Vacation mode
+
+- Pause chore countdowns while you're away: occupancy-driven chores (vacuum, mop, dust, declutter, clean, wash, wipe) stop accruing overdue time by default; maintenance chores keep ticking since that decay happens regardless of occupancy
+- Per-chore override to force-pause or force-exclude a chore regardless of its category default
+- Manual start/end from a new Home view banner, or via `aether vacation start/end/status`
+- Ending vacation shifts eligible chores' due dates forward by exactly the trip length, resuming the countdown where it left off
+
 ## 0.4.2
 
 ### Checklist time-to-complete and smarter check questions

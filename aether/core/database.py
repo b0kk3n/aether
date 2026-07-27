@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Generator
 import os
 
+from .models import DEFAULT_PAUSABLE_CATEGORIES
+
 # Default database path
 DEFAULT_DB_PATH = Path.home() / ".aether" / "aether.db"
 
@@ -82,6 +84,8 @@ CREATE TABLE IF NOT EXISTS chores (
     duration_confirmations INTEGER DEFAULT 0,
     interval_confirmed INTEGER DEFAULT 0,
     interval_confirmations INTEGER DEFAULT 0,
+    vacation_offset_days REAL NOT NULL DEFAULT 0,
+    vacation_override TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL
 );
@@ -115,6 +119,23 @@ CREATE TABLE IF NOT EXISTS checklist_chores (
     FOREIGN KEY (chore_id) REFERENCES chores(id) ON DELETE CASCADE
 );
 
+-- Vacation state (singleton global on/off switch)
+CREATE TABLE IF NOT EXISTS vacation_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    is_active INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT
+);
+INSERT OR IGNORE INTO vacation_state (id, is_active, started_at) VALUES (1, 0, NULL);
+
+-- Vacation history log
+CREATE TABLE IF NOT EXISTS vacation_log (
+    id TEXT PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    ended_at TEXT NOT NULL,
+    days_elapsed REAL NOT NULL,
+    chores_affected INTEGER NOT NULL DEFAULT 0
+);
+
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_chores_room_id ON chores(room_id);
 CREATE INDEX IF NOT EXISTS idx_chores_category ON chores(category);
@@ -124,10 +145,46 @@ CREATE INDEX IF NOT EXISTS idx_completion_logs_completed_at ON completion_logs(c
 """
 
 
+def _pausable_categories_sql() -> str:
+    """SQL IN-list of categories that default to vacation-pausable.
+
+    Generated from DEFAULT_PAUSABLE_CATEGORIES (models.py) so this view's
+    eligibility rule can't drift from is_vacation_eligible().
+    """
+    return ", ".join(f"'{c.value}'" for c in DEFAULT_PAUSABLE_CATEGORIES)
+
+
+# View used by every read path that computes due dates/freshness. Adds
+# effective_paused_days = accumulated vacation_offset_days, plus (only while
+# a vacation is active AND the chore is eligible) the live elapsed time of
+# the in-progress vacation. Callers add this to interval_days wherever they
+# currently do julianday(...) + interval_days arithmetic.
+CHORES_EFFECTIVE_VIEW_SQL = f"""
+CREATE VIEW IF NOT EXISTS chores_effective AS
+SELECT
+    c.*,
+    CASE
+        WHEN (SELECT is_active FROM vacation_state WHERE id = 1) = 1
+             AND (
+                 c.vacation_override = 'force_pause'
+                 OR (
+                     (c.vacation_override IS NULL OR c.vacation_override = '')
+                     AND c.category IN ({_pausable_categories_sql()})
+                 )
+             )
+        THEN c.vacation_offset_days
+             + (julianday('now') - julianday((SELECT started_at FROM vacation_state WHERE id = 1)))
+        ELSE c.vacation_offset_days
+    END AS effective_paused_days
+FROM chores c;
+"""
+
+
 def init_db():
     """Initialize the database with schema."""
     with get_db() as conn:
         conn.executescript(SCHEMA)
+        conn.executescript(CHORES_EFFECTIVE_VIEW_SQL)
 
 
 def reset_db():
@@ -137,13 +194,17 @@ def reset_db():
     """
     with get_db() as conn:
         conn.executescript("""
+            DROP VIEW IF EXISTS chores_effective;
             DROP TABLE IF EXISTS checklist_chores;
             DROP TABLE IF EXISTS checklists;
             DROP TABLE IF EXISTS completion_logs;
+            DROP TABLE IF EXISTS vacation_log;
+            DROP TABLE IF EXISTS vacation_state;
             DROP TABLE IF EXISTS chores;
             DROP TABLE IF EXISTS rooms;
         """)
         conn.executescript(SCHEMA)
+        conn.executescript(CHORES_EFFECTIVE_VIEW_SQL)
 
 
 def db_exists() -> bool:
@@ -170,7 +231,7 @@ def set_schema_version(conn: sqlite3.Connection, version: int):
 
 
 # Current schema version
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 
 def migrate_db():
@@ -181,6 +242,7 @@ def migrate_db():
         if current_version < 1:
             # Initial schema (v1)
             conn.executescript(SCHEMA)
+            conn.executescript(CHORES_EFFECTIVE_VIEW_SQL)
             set_schema_version(conn, 1)
 
         if current_version < 2:
@@ -194,3 +256,32 @@ def migrate_db():
             except Exception:
                 pass
             set_schema_version(conn, 2)
+
+        if current_version < 3:
+            # v3: vacation mode
+            try:
+                conn.execute("ALTER TABLE chores ADD COLUMN vacation_offset_days REAL NOT NULL DEFAULT 0")
+            except Exception:
+                pass  # Column may already exist on fresh DBs
+            try:
+                conn.execute("ALTER TABLE chores ADD COLUMN vacation_override TEXT")
+            except Exception:
+                pass
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS vacation_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    is_active INTEGER NOT NULL DEFAULT 0,
+                    started_at TEXT
+                );
+                INSERT OR IGNORE INTO vacation_state (id, is_active, started_at) VALUES (1, 0, NULL);
+                CREATE TABLE IF NOT EXISTS vacation_log (
+                    id TEXT PRIMARY KEY,
+                    started_at TEXT NOT NULL,
+                    ended_at TEXT NOT NULL,
+                    days_elapsed REAL NOT NULL,
+                    chores_affected INTEGER NOT NULL DEFAULT 0
+                );
+                DROP VIEW IF EXISTS chores_effective;
+            """)
+            conn.executescript(CHORES_EFFECTIVE_VIEW_SQL)
+            set_schema_version(conn, 3)

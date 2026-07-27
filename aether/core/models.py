@@ -44,6 +44,39 @@ class Category(str, Enum):
     MAINTAIN = "maintain"
 
 
+class VacationOverride(str, Enum):
+    """Per-chore override of the category-level vacation-pause default."""
+    FORCE_PAUSE = "force_pause"
+    FORCE_EXCLUDE = "force_exclude"
+
+
+# Categories whose chores are occupancy-driven (dirt/wear only accumulates
+# because the home is being lived in) and so default to pausing during
+# vacation mode. MAINTAIN is time/wear-driven regardless of occupancy and
+# is intentionally excluded.
+DEFAULT_PAUSABLE_CATEGORIES: frozenset = frozenset({
+    Category.VACUUM,
+    Category.MOP,
+    Category.DUST,
+    Category.DECLUTTER,
+    Category.CLEAN,
+    Category.WASH,
+    Category.WIPE,
+})
+
+
+def is_vacation_eligible(category, override) -> bool:
+    """Whether a chore's countdown pauses during vacation mode.
+
+    A per-chore override always wins over the category default.
+    """
+    if override == VacationOverride.FORCE_EXCLUDE:
+        return False
+    if override == VacationOverride.FORCE_PAUSE:
+        return True
+    return category in DEFAULT_PAUSABLE_CATEGORIES
+
+
 def priority_from_interval(interval_days: int) -> Priority:
     """Calculate priority based on interval.
 
@@ -103,6 +136,7 @@ class ChoreBase(BaseModel):
     category: Category = Category.CLEAN
     notes: str = ""
     is_active: bool = True
+    vacation_override: Optional[VacationOverride] = None
 
 
 class ChoreCreate(ChoreBase):
@@ -119,6 +153,7 @@ class ChoreUpdate(BaseModel):
     category: Optional[Category] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+    vacation_override: Optional[VacationOverride] = None
 
 
 class Chore(ChoreBase):
@@ -140,6 +175,9 @@ class Chore(ChoreBase):
     interval_confirmed: bool = False
     interval_confirmations: int = 0
 
+    # Vacation mode: accumulated + in-progress paused days (from chores_effective view)
+    vacation_paused_days: float = 0.0
+
     created_at: datetime = Field(default_factory=datetime.now)
 
     class Config:
@@ -151,10 +189,20 @@ class Chore(ChoreBase):
         return priority_from_interval(self.interval_days)
 
     @property
+    def vacation_eligible(self) -> bool:
+        """Whether this chore's countdown pauses during vacation mode."""
+        return is_vacation_eligible(self.category, self.vacation_override)
+
+    @property
+    def effective_interval_days(self) -> float:
+        """interval_days adjusted for accumulated + in-progress vacation pause."""
+        return self.interval_days + self.vacation_paused_days
+
+    @property
     def due_date(self) -> datetime:
         """When this chore is due."""
         reference = self.last_completed_at or self.created_at
-        return reference + timedelta(days=self.interval_days)
+        return reference + timedelta(days=self.effective_interval_days)
 
     @property
     def days_until_due(self) -> int:
@@ -176,14 +224,15 @@ class Chore(ChoreBase):
         """
         reference = self.last_completed_at or self.created_at
         days_since = (datetime.now() - reference).days
+        interval_days = self.effective_interval_days
 
         if days_since <= 0:
             return 100
-        if days_since >= self.interval_days:
+        if days_since >= interval_days:
             return 0
 
-        days_until = self.interval_days - days_since
-        decay_window = self.interval_days * 0.5
+        days_until = interval_days - days_since
+        decay_window = interval_days * 0.5
 
         if days_until > decay_window:
             return 100
@@ -239,6 +288,7 @@ class ChoreStatus(BaseModel):
     last_completed_at: Optional[datetime]
     estimated_minutes: int
     streak: int
+    vacation_eligible: bool = True
 
 
 # =============================================================================
@@ -347,3 +397,29 @@ class QuickCleanList(BaseModel):
     chores: list[ChoreStatus]
     total_minutes: int
     impact_summary: str  # e.g., "This will freshen up 3 rooms"
+
+
+# =============================================================================
+# Vacation Mode
+# =============================================================================
+
+class VacationStatus(BaseModel):
+    """Current global vacation-mode state."""
+    is_active: bool
+    started_at: Optional[datetime] = None
+    days_elapsed: float = 0.0  # live, only meaningful while is_active
+
+
+class VacationEndResult(BaseModel):
+    """Result of ending a vacation."""
+    days_elapsed: float
+    chores_affected: int
+
+
+class ChoreEligibility(BaseModel):
+    """Preview of whether a chore would pause under vacation mode."""
+    id: str
+    name: str
+    category: Category
+    vacation_override: Optional[VacationOverride] = None
+    vacation_eligible: bool

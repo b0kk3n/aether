@@ -39,21 +39,21 @@ class Prioritizer:
             rows = conn.execute(
                 """
                 SELECT c.*, r.name as room_name
-                FROM chores c
+                FROM chores_effective c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
                 AND (
                     -- Never done = always show
                     c.last_completed_at IS NULL
                     -- Overdue or due within 3 days
-                    OR julianday('now') - julianday(c.last_completed_at) >= c.interval_days - 3
+                    OR julianday('now') - julianday(c.last_completed_at) >= c.interval_days + c.effective_paused_days - 3
                 )
                 ORDER BY
                     -- Never done = highest priority
                     CASE WHEN c.last_completed_at IS NULL THEN 0 ELSE 1 END,
                     -- Then by how overdue (most overdue first)
                     CASE WHEN c.last_completed_at IS NULL THEN -999
-                         ELSE julianday(c.last_completed_at) + c.interval_days - julianday('now')
+                         ELSE julianday(c.last_completed_at) + c.interval_days + c.effective_paused_days - julianday('now')
                     END,
                     -- House-wide tasks before room-specific at same urgency
                     CASE WHEN c.room_id IS NULL THEN 0 ELSE 1 END,
@@ -127,12 +127,12 @@ class Prioritizer:
             rows = conn.execute(
                 """
                 SELECT DISTINCT r.name
-                FROM chores c
+                FROM chores_effective c
                 JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1
                 AND (
                     c.last_completed_at IS NULL
-                    OR julianday('now') - julianday(c.last_completed_at) > c.interval_days
+                    OR julianday('now') - julianday(c.last_completed_at) > c.interval_days + c.effective_paused_days
                 )
                 ORDER BY r.sort_order
                 LIMIT 3
@@ -191,13 +191,13 @@ class Prioritizer:
             rows = conn.execute(
                 """
                 SELECT c.*, r.name as room_name
-                FROM chores c
+                FROM chores_effective c
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE c.is_active = 1 AND c.category = ?
                 ORDER BY
                     CASE WHEN c.last_completed_at IS NULL THEN 0 ELSE 1 END,
                     CASE WHEN c.last_completed_at IS NULL THEN -999
-                         ELSE julianday(c.last_completed_at) + c.interval_days - julianday('now')
+                         ELSE julianday(c.last_completed_at) + c.interval_days + c.effective_paused_days - julianday('now')
                     END
                 """,
                 (category.value,),

@@ -145,6 +145,42 @@ body {
   margin-bottom: var(--space-md);
 }
 
+/* Vacation mode banner */
+.vacation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.vacation-banner-text {
+  font-size: var(--font-size-body);
+  color: var(--text-primary);
+}
+
+.vacation-banner-btn {
+  background: var(--accent);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.vacation-banner-link {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  padding: 0;
+}
+
 .card-swipe-bg {
   position: absolute;
   top: 0;

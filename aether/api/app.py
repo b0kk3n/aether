@@ -8,6 +8,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+from aether import __version__
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import os
@@ -60,7 +62,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Aether",
         description="Home Concierge - Your home, managed. Your mind, free.",
-        version="0.3.4",
+        version=__version__,
         lifespan=lifespan,
     )
 
@@ -83,7 +85,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health_check():
-        return {"status": "ok", "version": "0.3.4"}
+        return {"status": "ok", "version": __version__}
 
     # Dynamic PWA manifest — patches start_url and icon paths for ingress.
     # Must be registered BEFORE app.mount("/static", ...) so this route wins.

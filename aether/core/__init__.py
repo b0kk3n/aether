@@ -27,6 +27,11 @@ from .models import (
     QuickCleanList,
     Priority,
     Category,
+    VacationOverride,
+    VacationStatus,
+    VacationEndResult,
+    ChoreEligibility,
+    is_vacation_eligible,
 )
 
 from .database import init_db, reset_db, get_db, migrate_db
@@ -36,6 +41,7 @@ from .services import (
     ChoreService,
     ChecklistService,
     Prioritizer,
+    VacationService,
 )
 
 __all__ = [
@@ -60,6 +66,11 @@ __all__ = [
     "QuickCleanList",
     "Priority",
     "Category",
+    "VacationOverride",
+    "VacationStatus",
+    "VacationEndResult",
+    "ChoreEligibility",
+    "is_vacation_eligible",
     # Database
     "init_db",
     "reset_db",
@@ -70,4 +81,5 @@ __all__ = [
     "ChoreService",
     "ChecklistService",
     "Prioritizer",
+    "VacationService",
 ]

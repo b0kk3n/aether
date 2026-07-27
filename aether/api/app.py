@@ -20,6 +20,7 @@ from aether.api.routes import (
     chores_router,
     checklists_router,
     dashboard_router,
+    vacation_router,
 )
 
 # In the container, AETHER_STATIC_DIR and AETHER_TEMPLATE_DIR are set to
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(chores_router, prefix="/api")
     app.include_router(checklists_router, prefix="/api")
     app.include_router(dashboard_router, prefix="/api")
+    app.include_router(vacation_router, prefix="/api")
 
     @app.get("/api/health")
     def health_check():

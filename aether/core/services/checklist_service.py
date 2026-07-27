@@ -102,20 +102,20 @@ class ChecklistService:
                     SUM(
                         CASE
                             WHEN c.id IS NOT NULL
-                            AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days
+                            AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days + c.effective_paused_days
                             THEN 1 ELSE 0
                         END
                     ) as overdue_count,
                     COALESCE(SUM(
                         CASE
                             WHEN c.id IS NOT NULL
-                            AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days
+                            AND julianday('now') - julianday(COALESCE(c.last_completed_at, c.created_at)) > c.interval_days + c.effective_paused_days
                             THEN c.estimated_minutes ELSE 0
                         END
                     ), 0) as remaining_minutes
                 FROM checklists cl
                 LEFT JOIN checklist_chores cc ON cl.id = cc.checklist_id
-                LEFT JOIN chores c ON cc.chore_id = c.id AND c.is_active = 1
+                LEFT JOIN chores_effective c ON cc.chore_id = c.id AND c.is_active = 1
                 GROUP BY cl.id
                 ORDER BY cl.name
                 """
@@ -152,7 +152,7 @@ class ChecklistService:
                 """
                 SELECT c.*, r.name as room_name, cc.sort_order
                 FROM checklist_chores cc
-                JOIN chores c ON cc.chore_id = c.id
+                JOIN chores_effective c ON cc.chore_id = c.id
                 LEFT JOIN rooms r ON c.room_id = r.id
                 WHERE cc.checklist_id = ?
                 ORDER BY cc.sort_order

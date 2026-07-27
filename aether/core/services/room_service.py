@@ -112,23 +112,23 @@ class RoomService:
                         COUNT(*) as chore_count,
                         AVG(
                             CASE
-                                WHEN interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) <= 0
+                                WHEN (interval_days + effective_paused_days) - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) <= 0
                                     THEN 0
-                                WHEN interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) > 0.5 * interval_days
+                                WHEN (interval_days + effective_paused_days) - (julianday('now') - julianday(COALESCE(last_completed_at, created_at))) > 0.5 * (interval_days + effective_paused_days)
                                     THEN 100
                                 ELSE CAST(
-                                    ((interval_days - (julianday('now') - julianday(COALESCE(last_completed_at, created_at)))) / (0.5 * interval_days)) * 100
+                                    (((interval_days + effective_paused_days) - (julianday('now') - julianday(COALESCE(last_completed_at, created_at)))) / (0.5 * (interval_days + effective_paused_days))) * 100
                                     AS INTEGER
                                 )
                             END
                         ) as avg_freshness,
                         SUM(
                             CASE
-                                WHEN julianday('now') - julianday(COALESCE(last_completed_at, created_at)) > interval_days THEN 1
+                                WHEN julianday('now') - julianday(COALESCE(last_completed_at, created_at)) > (interval_days + effective_paused_days) THEN 1
                                 ELSE 0
                             END
                         ) as overdue_count
-                    FROM chores
+                    FROM chores_effective
                     WHERE room_id = ? AND is_active = 1
                     """,
                     (room.id,),

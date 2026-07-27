@@ -290,8 +290,11 @@ async function loadHomeView() {
   appContent.innerHTML = '<div class="loading">Loading...</div>';
 
   try {
-    const briefing = await api('/dashboard/briefing');
-    renderHomeView(briefing);
+    const [briefing, vacationStatus] = await Promise.all([
+      api('/dashboard/briefing'),
+      api('/vacation'),
+    ]);
+    renderHomeView(briefing, vacationStatus);
   } catch (err) {
     appContent.innerHTML = `<div class="empty-state">
       <div class="empty-state-icon">!</div>
@@ -300,8 +303,32 @@ async function loadHomeView() {
   }
 }
 
-function renderHomeView(briefing) {
+function formatVacationDays(days) {
+  if (days < 1) return 'less than a day';
+  const whole = Math.floor(days);
+  return whole === 1 ? '1 day' : `${whole} days`;
+}
+
+function renderVacationBanner(status) {
+  if (status && status.is_active) {
+    return `
+      <div class="vacation-banner">
+        <span class="vacation-banner-text">&#127796; Vacation mode active &mdash; ${formatVacationDays(status.days_elapsed)} paused</span>
+        <button class="vacation-banner-btn" onclick="showEndVacationModal()">End vacation</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="vacation-banner">
+      <span class="vacation-banner-text">Heading out?</span>
+      <button class="vacation-banner-link" onclick="showStartVacationModal()">&#127796; Start vacation mode</button>
+    </div>
+  `;
+}
+
+function renderHomeView(briefing, vacationStatus) {
   const html = `
+    ${renderVacationBanner(vacationStatus)}
     <div class="greeting">
       <div class="greeting-text">${briefing.greeting}.</div>
       <div class="greeting-sub">
@@ -1150,6 +1177,116 @@ function dismissIntervalModal() {
   }, 300);
 }
 
+// Vacation Mode
+
+async function showStartVacationModal() {
+  let eligibility = [];
+  try {
+    eligibility = await api('/vacation/eligibility');
+  } catch (err) {
+    console.error('Failed to load vacation eligibility:', err);
+  }
+  const willPause = eligibility.filter(c => c.vacation_eligible).length;
+  const wontPause = eligibility.length - willPause;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'vacation-modal-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+  sheet.id = 'vacation-modal-sheet';
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Start vacation mode?</div>
+    <div class="modal-subtitle">
+      ${willPause} chore${willPause === 1 ? '' : 's'} will pause while you're away${wontPause > 0 ? `, ${wontPause} won't (maintenance)` : ''}.
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-primary" onclick="confirmStartVacation()">Start vacation</button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissVacationModal()">Cancel</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+  overlay.addEventListener('click', dismissVacationModal);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+  });
+}
+
+async function confirmStartVacation() {
+  dismissVacationModal();
+  try {
+    await api('/vacation/start', { method: 'POST' });
+    refreshCurrentView();
+  } catch (err) {
+    console.error('Failed to start vacation mode:', err);
+  }
+}
+
+function showEndVacationModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'vacation-modal-overlay';
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+  sheet.id = 'vacation-modal-sheet';
+  sheet.innerHTML = `
+    <div class="modal-handle"></div>
+    <div class="modal-title">Welcome back!</div>
+    <div class="modal-subtitle">Ending vacation mode resumes paused chores right where they left off.</div>
+    <div class="modal-buttons">
+      <button class="modal-btn modal-btn-primary" onclick="confirmEndVacation()">End vacation</button>
+      <button class="modal-btn modal-btn-tertiary" onclick="dismissVacationModal()">Not yet</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+  overlay.addEventListener('click', dismissVacationModal);
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    sheet.classList.add('visible');
+  });
+}
+
+async function confirmEndVacation() {
+  try {
+    const result = await api('/vacation/end', { method: 'POST' });
+    const sheet = document.getElementById('vacation-modal-sheet');
+    if (sheet) {
+      sheet.innerHTML = `
+        <div class="modal-handle"></div>
+        <div class="modal-title">Welcome back!</div>
+        <div class="modal-subtitle">${result.chores_affected} chore${result.chores_affected === 1 ? '' : 's'} shifted forward by ${formatVacationDays(result.days_elapsed)}.</div>
+        <div class="modal-buttons">
+          <button class="modal-btn modal-btn-primary" onclick="dismissVacationModal(); refreshCurrentView();">Done</button>
+        </div>
+      `;
+    } else {
+      refreshCurrentView();
+    }
+  } catch (err) {
+    console.error('Failed to end vacation mode:', err);
+    dismissVacationModal();
+  }
+}
+
+function dismissVacationModal() {
+  const overlay = document.getElementById('vacation-modal-overlay');
+  const sheet = document.getElementById('vacation-modal-sheet');
+  if (!overlay) return;
+  overlay.classList.remove('visible');
+  sheet.classList.remove('visible');
+  setTimeout(() => { overlay.remove(); sheet.remove(); }, 300);
+}
+
 // Checklist Management
 
 async function removeChoreFromChecklist(choreId) {
@@ -1503,6 +1640,15 @@ function showChoreForm(chore, rooms, defaultRoomId = null) {
     </div>
 
     <div class="form-group">
+      <label class="form-label">Vacation pausing</label>
+      <select id="chore-form-vacation-override" class="form-select">
+        <option value="" ${!chore || !chore.vacation_override ? 'selected' : ''}>Use category default</option>
+        <option value="force_pause" ${chore && chore.vacation_override === 'force_pause' ? 'selected' : ''}>Always pause</option>
+        <option value="force_exclude" ${chore && chore.vacation_override === 'force_exclude' ? 'selected' : ''}>Never pause</option>
+      </select>
+    </div>
+
+    <div class="form-group">
       <label class="form-label">Repeat every</label>
       <div class="duration-input-group">
         <button class="duration-btn" onclick="stepFormValue('chore-form-interval', -1)">−</button>
@@ -1566,6 +1712,7 @@ async function submitChoreForm(choreId, isEdit) {
   const category = document.getElementById('chore-form-category')?.value;
   const intervalDays = parseInt(document.getElementById('chore-form-interval')?.value, 10);
   const estimatedMinutes = parseInt(document.getElementById('chore-form-duration')?.value, 10);
+  const vacationOverride = document.getElementById('chore-form-vacation-override')?.value || null;
 
   if (!name) {
     const nameInput = document.getElementById('chore-form-name');
@@ -1579,6 +1726,7 @@ async function submitChoreForm(choreId, isEdit) {
     category,
     interval_days: intervalDays,
     estimated_minutes: estimatedMinutes,
+    vacation_override: vacationOverride,
   };
 
   try {
@@ -1685,3 +1833,8 @@ window.showCreateChecklistForm = showCreateChecklistForm;
 window.selectChecklistIcon = selectChecklistIcon;
 window.submitCreateChecklist = submitCreateChecklist;
 window.dismissChecklistForm = dismissChecklistForm;
+window.showStartVacationModal = showStartVacationModal;
+window.confirmStartVacation = confirmStartVacation;
+window.showEndVacationModal = showEndVacationModal;
+window.confirmEndVacation = confirmEndVacation;
+window.dismissVacationModal = dismissVacationModal;

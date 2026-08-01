@@ -158,9 +158,18 @@ CREATE TABLE IF NOT EXISTS vacation_log (
 );
 
 -- Indexes for common queries
+-- NOTE: idx_chores_category_id is intentionally NOT created here. On a
+-- fresh install the chores table (with category_id) is created above in
+-- this same script, so it would be safe - but on an EXISTING database
+-- being upgraded, `CREATE TABLE IF NOT EXISTS chores` above is a no-op
+-- (the table already exists without category_id), and init_db() always
+-- runs before migrate_db() adds that column via ALTER TABLE. Indexing a
+-- column that doesn't exist yet crashes executescript() and takes down
+-- the whole app before migrate_db() gets a chance to fix the schema. It's
+-- created instead in migrate_db()'s v4 block, right after the column is
+-- guaranteed to exist, for both fresh installs and upgrades alike.
 CREATE INDEX IF NOT EXISTS idx_chores_room_id ON chores(room_id);
 CREATE INDEX IF NOT EXISTS idx_chores_category ON chores(category);
-CREATE INDEX IF NOT EXISTS idx_chores_category_id ON chores(category_id);
 CREATE INDEX IF NOT EXISTS idx_chores_is_active ON chores(is_active);
 CREATE INDEX IF NOT EXISTS idx_completion_logs_chore_id ON completion_logs(chore_id);
 CREATE INDEX IF NOT EXISTS idx_completion_logs_completed_at ON completion_logs(completed_at);
@@ -379,6 +388,7 @@ def migrate_db():
                 pass  # Column may already exist on fresh DBs
             conn.executescript(CATEGORIES_TABLE_SQL)
             conn.execute("UPDATE chores SET category_id = category WHERE category_id IS NULL")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_chores_category_id ON chores(category_id)")
             conn.executescript("DROP VIEW IF EXISTS chores_effective;")
             conn.executescript(CHORES_EFFECTIVE_VIEW_SQL_V4)
             set_schema_version(conn, 4)

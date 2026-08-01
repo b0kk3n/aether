@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1
+
+### Fix: startup crash on existing installations
+
+0.6.0 crashed on boot for any existing (non-fresh) database with
+`sqlite3.OperationalError: no such column: category_id`. An index on the
+new `category_id` column was created too early (during `init_db()`,
+before the migration that adds the column to existing databases), so
+existing installs never got the chance to migrate - the app crash-looped
+before reaching that code. Fixed by creating the index inside the
+migration step instead, after the column is guaranteed to exist. No data
+loss; existing rooms/chores/checklists are unaffected once updated.
+
 ## 0.6.0
 
 ### Settings tab, editable categories, room pause

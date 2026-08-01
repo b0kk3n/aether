@@ -4,8 +4,8 @@ from datetime import datetime
 
 from aether.core.models import (
     ChoreEligibility,
-    Category,
     VacationEndResult,
+    VacationLogEntry,
     VacationStatus,
     is_vacation_eligible,
     generate_id,
@@ -69,13 +69,21 @@ class VacationService:
 
         with get_db() as conn:
             chore_rows = conn.execute(
-                "SELECT id, category, vacation_override FROM chores WHERE is_active = 1"
+                """
+                SELECT c.id, c.vacation_override, cat.is_vacation_pausable_default
+                FROM chores c
+                LEFT JOIN categories cat ON c.category_id = cat.id
+                WHERE c.is_active = 1
+                """
             ).fetchall()
 
             eligible_ids = [
                 row["id"]
                 for row in chore_rows
-                if is_vacation_eligible(row["category"], row["vacation_override"] or None)
+                if is_vacation_eligible(
+                    bool(row["is_vacation_pausable_default"]) if row["is_vacation_pausable_default"] is not None else False,
+                    row["vacation_override"] or None,
+                )
             ]
 
             if eligible_ids:
@@ -111,17 +119,45 @@ class VacationService:
         """Non-mutating preview of which active chores would pause right now."""
         with get_db() as conn:
             rows = conn.execute(
-                "SELECT id, name, category, vacation_override FROM chores "
-                "WHERE is_active = 1 ORDER BY name"
+                """
+                SELECT c.id, c.name, c.vacation_override,
+                       cat.name AS cat_name, cat.is_vacation_pausable_default
+                FROM chores c
+                LEFT JOIN categories cat ON c.category_id = cat.id
+                WHERE c.is_active = 1
+                ORDER BY c.name
+                """
             ).fetchall()
 
         return [
             ChoreEligibility(
                 id=row["id"],
                 name=row["name"],
-                category=Category(row["category"]),
+                category_name=row["cat_name"] or "",
                 vacation_override=row["vacation_override"] or None,
-                vacation_eligible=is_vacation_eligible(row["category"], row["vacation_override"] or None),
+                vacation_eligible=is_vacation_eligible(
+                    bool(row["is_vacation_pausable_default"]) if row["is_vacation_pausable_default"] is not None else False,
+                    row["vacation_override"] or None,
+                ),
+            )
+            for row in rows
+        ]
+
+    @staticmethod
+    def get_history(limit: int = 20) -> list[VacationLogEntry]:
+        """Past vacation records, most recent first."""
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM vacation_log ORDER BY ended_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+
+        return [
+            VacationLogEntry(
+                id=row["id"],
+                started_at=datetime.fromisoformat(row["started_at"]),
+                ended_at=datetime.fromisoformat(row["ended_at"]),
+                days_elapsed=row["days_elapsed"],
+                chores_affected=row["chores_affected"],
             )
             for row in rows
         ]

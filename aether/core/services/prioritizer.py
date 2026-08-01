@@ -16,7 +16,6 @@ from aether.core.models import (
     Dashboard,
     DashboardRoom,
     Priority,
-    Category,
 )
 from aether.core.database import get_db
 from aether.core.services.room_service import RoomService
@@ -121,30 +120,10 @@ class Prioritizer:
         else:
             greeting = "Good evening"
 
-        # Find rooms that need attention (have overdue chores)
-        rooms_needing_attention = []
-        with get_db() as conn:
-            rows = conn.execute(
-                """
-                SELECT DISTINCT r.name
-                FROM chores_effective c
-                JOIN rooms r ON c.room_id = r.id
-                WHERE c.is_active = 1
-                AND (
-                    c.last_completed_at IS NULL
-                    OR julianday('now') - julianday(c.last_completed_at) > c.interval_days + c.effective_paused_days
-                )
-                ORDER BY r.sort_order
-                LIMIT 3
-                """
-            ).fetchall()
-            rooms_needing_attention = [row["name"] for row in rows]
-
         return Briefing(
             greeting=greeting,
             suggested_chores=quick_list.chores,
             total_minutes=quick_list.total_minutes,
-            rooms_needing_attention=rooms_needing_attention,
         )
 
     @staticmethod
@@ -182,7 +161,7 @@ class Prioritizer:
         )
 
     @staticmethod
-    def get_by_category(category: Category) -> list[ChoreStatus]:
+    def get_by_category(category_id: str) -> list[ChoreStatus]:
         """Get all chores of a specific category, sorted by urgency.
 
         Useful for "vacuum day" or "dusting session" type activities.
@@ -193,14 +172,14 @@ class Prioritizer:
                 SELECT c.*, r.name as room_name
                 FROM chores_effective c
                 LEFT JOIN rooms r ON c.room_id = r.id
-                WHERE c.is_active = 1 AND c.category = ?
+                WHERE c.is_active = 1 AND c.category_id = ?
                 ORDER BY
                     CASE WHEN c.last_completed_at IS NULL THEN 0 ELSE 1 END,
                     CASE WHEN c.last_completed_at IS NULL THEN -999
                          ELSE julianday(c.last_completed_at) + c.interval_days + c.effective_paused_days - julianday('now')
                     END
                 """,
-                (category.value,),
+                (category_id,),
             ).fetchall()
 
         return [ChoreService._row_to_chore_status(row, row["room_name"]) for row in rows]

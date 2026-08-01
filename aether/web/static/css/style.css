@@ -12,7 +12,7 @@
   --text-tertiary: #5A5A5A;
 
   --fresh: #3DD68C;
-  --aging: #7A9E7A;
+  --aging: #8FB596;
   --due-soon: #F0B429;
   --overdue: #EF6B4A;
 
@@ -29,6 +29,11 @@
 
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  /* Display font for headings/titles only - a curated system serif stack
+     (not a bundled webfont: this is a local-first Home Assistant add-on
+     and shouldn't gain a network dependency just to render a heading).
+     Body copy, captions and buttons stay on --font-family above. */
+  --font-family-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, 'Noto Serif', serif;
   --font-size-hero: 32px;
   --font-size-title: 20px;
   --font-size-body: 16px;
@@ -98,6 +103,7 @@ body {
 
 /* Typography */
 .hero {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-hero);
   font-weight: var(--font-weight-bold);
   line-height: 1.2;
@@ -105,6 +111,7 @@ body {
 }
 
 .title {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-semibold);
   line-height: 1.3;
@@ -145,40 +152,21 @@ body {
   margin-bottom: var(--space-md);
 }
 
-/* Vacation mode banner */
-.vacation-banner {
-  display: flex;
+/* Vacation mode chip - a quiet, informational indicator on Home (no
+   button/action; start/end controls live in Settings) */
+.vacation-chip {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  background: var(--bg-surface);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  margin-bottom: var(--space-lg);
-}
-
-.vacation-banner-text {
-  font-size: var(--font-size-body);
-  color: var(--text-primary);
-}
-
-.vacation-banner-btn {
-  background: var(--accent);
-  color: var(--bg-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: var(--space-sm) var(--space-md);
+  gap: var(--space-xs);
+  color: var(--text-tertiary);
   font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
+  margin-top: var(--space-xs);
 }
 
-.vacation-banner-link {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  padding: 0;
+.vacation-chip svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
 }
 
 .card-swipe-bg {
@@ -251,10 +239,10 @@ body {
   flex-shrink: 0;
 }
 
-.chore-status.fresh { background: var(--fresh); }
-.chore-status.aging { background: var(--aging); }
-.chore-status.due-soon { background: var(--due-soon); }
-.chore-status.overdue { background: var(--overdue); }
+.chore-status.fresh { background: var(--fresh); box-shadow: 0 0 5px 0 rgba(61, 214, 140, 0.5); }
+.chore-status.aging { background: var(--aging); box-shadow: 0 0 5px 0 rgba(143, 181, 150, 0.4); }
+.chore-status.due-soon { background: var(--due-soon); box-shadow: 0 0 5px 0 rgba(240, 180, 41, 0.5); }
+.chore-status.overdue { background: var(--overdue); box-shadow: 0 0 5px 0 rgba(239, 107, 74, 0.5); }
 
 /* Room Card */
 .room-grid {
@@ -282,22 +270,64 @@ body {
   margin-bottom: var(--space-md);
 }
 
+.room-icon .icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.room-paused {
+  opacity: 0.7;
+}
+
+.room-paused-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-small);
+  color: var(--due-soon);
+  background: rgba(240, 180, 41, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.room-paused-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.room-reorder-controls {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.room-reorder-controls .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.room-reorder-controls .icon-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .room-name {
+  font-family: var(--font-family-display);
   font-weight: var(--font-weight-semibold);
   margin-bottom: var(--space-sm);
 }
 
 .room-progress {
-  height: 4px;
+  height: 6px;
   background: var(--border);
-  border-radius: 2px;
-  overflow: hidden;
+  border-radius: 999px;
   margin-bottom: var(--space-xs);
 }
 
 .room-progress-bar {
   height: 100%;
-  border-radius: 2px;
+  border-radius: 999px;
   transition: width var(--transition-slow);
 }
 
@@ -306,11 +336,12 @@ body {
   color: var(--text-secondary);
 }
 
-/* Progress bar colors */
-.progress-fresh { background: var(--fresh); }
-.progress-aging { background: var(--aging); }
-.progress-due-soon { background: var(--due-soon); }
-.progress-overdue { background: var(--overdue); }
+/* Progress bar colors - a soft glow in the state color adds a touch of
+   depth over a flat fill, without changing the underlying 4-state scale. */
+.progress-fresh { background: var(--fresh); box-shadow: 0 0 6px 0 rgba(61, 214, 140, 0.4); }
+.progress-aging { background: var(--aging); box-shadow: 0 0 6px 0 rgba(143, 181, 150, 0.35); }
+.progress-due-soon { background: var(--due-soon); box-shadow: 0 0 6px 0 rgba(240, 180, 41, 0.4); }
+.progress-overdue { background: var(--overdue); box-shadow: 0 0 6px 0 rgba(239, 107, 74, 0.4); }
 
 /* Bottom Navigation */
 .bottom-nav {
@@ -409,6 +440,7 @@ body {
 }
 
 .greeting-text {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-hero);
   font-weight: var(--font-weight-bold);
   line-height: 1.2;
@@ -577,6 +609,13 @@ body {
   font-size: 48px;
   margin-bottom: var(--space-md);
   opacity: 0.5;
+  display: flex;
+  justify-content: center;
+}
+
+.empty-state-icon svg {
+  width: 40px;
+  height: 40px;
 }
 
 .empty-state-text {
@@ -623,6 +662,7 @@ body {
 }
 
 .modal-title {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-semibold);
   margin-bottom: var(--space-sm);
@@ -788,9 +828,38 @@ body {
   background: var(--bg-elevated);
 }
 
+.icon-btn.active {
+  background: var(--bg-elevated);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .icon-btn svg {
   width: 18px;
   height: 18px;
+}
+
+/* Generic icon wrapper (renderIcon()'s output) - inline with text by
+   default; specific contexts (room-icon, category-row-icon, ...) override. */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon.icon-emoji {
+  font-size: 1em;
+  line-height: 1;
 }
 
 /* Chore Form Sheet */
@@ -1029,6 +1098,7 @@ body {
 }
 
 .modal-title {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-semibold);
   margin-bottom: var(--space-sm);
@@ -1117,4 +1187,179 @@ body {
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
   color: var(--text-secondary);
+}
+
+/* Settings */
+.settings-panel {
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.settings-panel-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-body);
+}
+
+.settings-panel-status svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: var(--font-size-body);
+  transition: background var(--transition-fast);
+}
+
+.settings-row:active {
+  background: var(--bg-elevated);
+}
+
+.settings-row svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-tertiary);
+}
+
+/* Category rows */
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.category-row:last-child {
+  border-bottom: none;
+}
+
+.category-row-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.category-row-icon .icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.category-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.category-row-reorder {
+  display: flex;
+  gap: 2px;
+}
+
+.category-row-reorder .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.category-row-reorder .icon-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Toggle switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.switch-track::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: var(--text-primary);
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+}
+
+.switch input:checked + .switch-track {
+  background: var(--fresh);
+}
+
+.switch input:checked + .switch-track::before {
+  transform: translateX(16px);
+}
+
+/* Chores browser filter bar */
+.chores-filter-bar {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.chores-filter-bar .form-select {
+  padding: var(--space-sm) var(--space-md);
+  padding-right: 36px;
+  font-size: var(--font-size-caption);
+}
+
+/* Selectable chore-picker row (checklist bulk-add) */
+.chore-picker-item-selectable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-direction: row;
+}
+
+.chore-picker-checkbox {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--fresh);
+}
+
+.chore-picker-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.icon-picker-btn .icon svg {
+  width: 22px;
+  height: 22px;
 }

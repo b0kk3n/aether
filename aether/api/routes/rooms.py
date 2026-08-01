@@ -69,5 +69,32 @@ def reorder_rooms(room_ids: list[str]):
 @router.delete("/{room_id}", status_code=204)
 def delete_room(room_id: str):
     """Delete a room. Associated chores will become house-wide."""
-    if not RoomService.delete(room_id):
+    success, error = RoomService.delete(room_id)
+    if not success:
+        if error:
+            raise HTTPException(status_code=409, detail=error)
         raise HTTPException(status_code=404, detail="Room not found")
+
+
+@router.post("/{room_id}/pause", response_model=RoomWithFreshness)
+def pause_room(room_id: str):
+    """Pause a room (e.g. mid-remodel), freezing all of its chores."""
+    try:
+        room = RoomService.pause(room_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return get_room(room_id)
+
+
+@router.post("/{room_id}/unpause", response_model=RoomWithFreshness)
+def unpause_room(room_id: str):
+    """Unpause a room, shifting its chores' due dates forward by the pause length."""
+    try:
+        room = RoomService.unpause(room_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return get_room(room_id)

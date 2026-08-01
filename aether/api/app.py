@@ -20,6 +20,7 @@ from aether.seed.seeder import seed_database
 from aether.api.routes import (
     rooms_router,
     chores_router,
+    categories_router,
     checklists_router,
     dashboard_router,
     vacation_router,
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     # API routes
     app.include_router(rooms_router, prefix="/api")
     app.include_router(chores_router, prefix="/api")
+    app.include_router(categories_router, prefix="/api")
     app.include_router(checklists_router, prefix="/api")
     app.include_router(dashboard_router, prefix="/api")
     app.include_router(vacation_router, prefix="/api")

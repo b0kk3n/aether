@@ -32,49 +32,23 @@ class Priority(str, Enum):
     LOW = "low"
 
 
-class Category(str, Enum):
-    """Chore category for filtering and grouping."""
-    VACUUM = "vacuum"
-    MOP = "mop"
-    DUST = "dust"
-    DECLUTTER = "declutter"
-    CLEAN = "clean"
-    WASH = "wash"
-    WIPE = "wipe"
-    MAINTAIN = "maintain"
-
-
 class VacationOverride(str, Enum):
     """Per-chore override of the category-level vacation-pause default."""
     FORCE_PAUSE = "force_pause"
     FORCE_EXCLUDE = "force_exclude"
 
 
-# Categories whose chores are occupancy-driven (dirt/wear only accumulates
-# because the home is being lived in) and so default to pausing during
-# vacation mode. MAINTAIN is time/wear-driven regardless of occupancy and
-# is intentionally excluded.
-DEFAULT_PAUSABLE_CATEGORIES: frozenset = frozenset({
-    Category.VACUUM,
-    Category.MOP,
-    Category.DUST,
-    Category.DECLUTTER,
-    Category.CLEAN,
-    Category.WASH,
-    Category.WIPE,
-})
-
-
-def is_vacation_eligible(category, override) -> bool:
+def is_vacation_eligible(category_pausable_default: bool, override) -> bool:
     """Whether a chore's countdown pauses during vacation mode.
 
-    A per-chore override always wins over the category default.
+    A per-chore override always wins over the category's own
+    is_vacation_pausable_default setting.
     """
     if override == VacationOverride.FORCE_EXCLUDE:
         return False
     if override == VacationOverride.FORCE_PAUSE:
         return True
-    return category in DEFAULT_PAUSABLE_CATEGORIES
+    return bool(category_pausable_default)
 
 
 def priority_from_interval(interval_days: int) -> Priority:
@@ -98,7 +72,7 @@ def priority_from_interval(interval_days: int) -> Priority:
 class RoomBase(BaseModel):
     """Base room model for creation/updates."""
     name: str
-    icon: str = "🏠"
+    icon: str = "home"
     sort_order: int = 0
 
 
@@ -110,6 +84,8 @@ class RoomCreate(RoomBase):
 class Room(RoomBase):
     """A room in the home."""
     id: str = Field(default_factory=generate_id)
+    is_paused: bool = False
+    paused_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
 
     class Config:
@@ -124,6 +100,40 @@ class RoomWithFreshness(Room):
 
 
 # =============================================================================
+# Category
+# =============================================================================
+
+class CategoryBase(BaseModel):
+    """Base category model for creation/updates."""
+    name: str
+    icon: str = "tag"
+    sort_order: int = 0
+    is_vacation_pausable_default: bool = True
+
+
+class CategoryCreate(CategoryBase):
+    """Model for creating a category."""
+    pass
+
+
+class CategoryUpdate(BaseModel):
+    """Model for updating a category."""
+    name: Optional[str] = None
+    icon: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_vacation_pausable_default: Optional[bool] = None
+
+
+class Category(CategoryBase):
+    """A user-editable chore category."""
+    id: str = Field(default_factory=generate_id)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    class Config:
+        from_attributes = True
+
+
+# =============================================================================
 # Chore
 # =============================================================================
 
@@ -133,7 +143,7 @@ class ChoreBase(BaseModel):
     room_id: Optional[str] = None  # None = house-wide
     interval_days: int
     estimated_minutes: int = 15
-    category: Category = Category.CLEAN
+    category_id: str
     notes: str = ""
     is_active: bool = True
     vacation_override: Optional[VacationOverride] = None
@@ -150,7 +160,7 @@ class ChoreUpdate(BaseModel):
     room_id: Optional[str] = None
     interval_days: Optional[int] = None
     estimated_minutes: Optional[int] = None
-    category: Optional[Category] = None
+    category_id: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
     vacation_override: Optional[VacationOverride] = None
@@ -175,8 +185,14 @@ class Chore(ChoreBase):
     interval_confirmed: bool = False
     interval_confirmations: int = 0
 
-    # Vacation mode: accumulated + in-progress paused days (from chores_effective view)
+    # Accumulated + in-progress paused days from vacation mode AND room pause
+    # combined (from chores_effective view's effective_paused_days column).
     vacation_paused_days: float = 0.0
+
+    # Category display info, populated from the chores_effective view's join.
+    category_pausable_default: bool = True
+    category_name: Optional[str] = None
+    category_icon: Optional[str] = None
 
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -191,7 +207,7 @@ class Chore(ChoreBase):
     @property
     def vacation_eligible(self) -> bool:
         """Whether this chore's countdown pauses during vacation mode."""
-        return is_vacation_eligible(self.category, self.vacation_override)
+        return is_vacation_eligible(self.category_pausable_default, self.vacation_override)
 
     @property
     def effective_interval_days(self) -> float:
@@ -281,7 +297,9 @@ class ChoreStatus(BaseModel):
     name: str
     room_name: Optional[str]
     priority: Priority
-    category: Category
+    category: str  # category display name
+    category_id: str
+    category_icon: Optional[str] = None
     days_until_due: int
     freshness_percent: int
     is_overdue: bool
@@ -323,7 +341,7 @@ class ChecklistBase(BaseModel):
     """Base checklist model."""
     name: str
     description: str = ""
-    icon: str = "📋"
+    icon: str = "clipboard"
     overdue_count: int = 0
     total_minutes: int = 0
     remaining_minutes: int = 0
@@ -388,7 +406,6 @@ class Briefing(BaseModel):
     greeting: str
     suggested_chores: list[ChoreStatus]
     total_minutes: int
-    rooms_needing_attention: list[str]
 
 
 class QuickCleanList(BaseModel):
@@ -416,10 +433,19 @@ class VacationEndResult(BaseModel):
     chores_affected: int
 
 
+class VacationLogEntry(BaseModel):
+    """A past vacation's record from vacation_log."""
+    id: str
+    started_at: datetime
+    ended_at: datetime
+    days_elapsed: float
+    chores_affected: int
+
+
 class ChoreEligibility(BaseModel):
     """Preview of whether a chore would pause under vacation mode."""
     id: str
     name: str
-    category: Category
+    category_name: str
     vacation_override: Optional[VacationOverride] = None
     vacation_eligible: bool

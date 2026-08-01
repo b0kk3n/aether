@@ -10,8 +10,6 @@ from pathlib import Path
 from typing import Generator
 import os
 
-from .models import DEFAULT_PAUSABLE_CATEGORIES
-
 # Default database path
 DEFAULT_DB_PATH = Path.home() / ".aether" / "aether.db"
 
@@ -62,10 +60,31 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS rooms (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    icon TEXT DEFAULT '🏠',
+    icon TEXT DEFAULT 'home',
     sort_order INTEGER DEFAULT 0,
+    is_paused INTEGER DEFAULT 0,
+    paused_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Categories table
+CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT 'tag',
+    sort_order INTEGER DEFAULT 0,
+    is_vacation_pausable_default INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO categories (id, name, icon, sort_order, is_vacation_pausable_default) VALUES
+    ('vacuum', 'Vacuum', 'vacuum', 0, 1),
+    ('mop', 'Mop', 'mop', 1, 1),
+    ('dust', 'Dust', 'dust', 2, 1),
+    ('declutter', 'Declutter', 'declutter', 3, 1),
+    ('clean', 'Clean', 'clean', 4, 1),
+    ('wash', 'Wash', 'wash', 5, 1),
+    ('wipe', 'Wipe', 'wipe', 6, 1),
+    ('maintain', 'Maintain', 'maintain', 7, 0);
 
 -- Chores table
 CREATE TABLE IF NOT EXISTS chores (
@@ -75,6 +94,7 @@ CREATE TABLE IF NOT EXISTS chores (
     interval_days INTEGER NOT NULL,
     estimated_minutes INTEGER DEFAULT 15,
     category TEXT DEFAULT 'clean',
+    category_id TEXT REFERENCES categories(id),
     notes TEXT DEFAULT '',
     is_active INTEGER DEFAULT 1,
     last_completed_at TEXT,
@@ -86,6 +106,7 @@ CREATE TABLE IF NOT EXISTS chores (
     interval_confirmations INTEGER DEFAULT 0,
     vacation_offset_days REAL NOT NULL DEFAULT 0,
     vacation_override TEXT,
+    room_pause_offset_days REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL
 );
@@ -105,7 +126,7 @@ CREATE TABLE IF NOT EXISTS checklists (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT DEFAULT '',
-    icon TEXT DEFAULT '📋',
+    icon TEXT DEFAULT 'clipboard',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -139,44 +160,108 @@ CREATE TABLE IF NOT EXISTS vacation_log (
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_chores_room_id ON chores(room_id);
 CREATE INDEX IF NOT EXISTS idx_chores_category ON chores(category);
+CREATE INDEX IF NOT EXISTS idx_chores_category_id ON chores(category_id);
 CREATE INDEX IF NOT EXISTS idx_chores_is_active ON chores(is_active);
 CREATE INDEX IF NOT EXISTS idx_completion_logs_chore_id ON completion_logs(chore_id);
 CREATE INDEX IF NOT EXISTS idx_completion_logs_completed_at ON completion_logs(completed_at);
 """
 
-
-def _pausable_categories_sql() -> str:
-    """SQL IN-list of categories that default to vacation-pausable.
-
-    Generated from DEFAULT_PAUSABLE_CATEGORIES (models.py) so this view's
-    eligibility rule can't drift from is_vacation_eligible().
-    """
-    return ", ".join(f"'{c.value}'" for c in DEFAULT_PAUSABLE_CATEGORIES)
-
+# Categories table + seed rows, shared verbatim between SCHEMA (fresh installs
+# already have this via SCHEMA above) and the v4 migration path (which adds it
+# to pre-existing databases). Kept as one string so the two paths can't drift.
+CATEGORIES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT 'tag',
+    sort_order INTEGER DEFAULT 0,
+    is_vacation_pausable_default INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO categories (id, name, icon, sort_order, is_vacation_pausable_default) VALUES
+    ('vacuum', 'Vacuum', 'vacuum', 0, 1),
+    ('mop', 'Mop', 'mop', 1, 1),
+    ('dust', 'Dust', 'dust', 2, 1),
+    ('declutter', 'Declutter', 'declutter', 3, 1),
+    ('clean', 'Clean', 'clean', 4, 1),
+    ('wash', 'Wash', 'wash', 5, 1),
+    ('wipe', 'Wipe', 'wipe', 6, 1),
+    ('maintain', 'Maintain', 'maintain', 7, 0);
+"""
 
 # View used by every read path that computes due dates/freshness. Adds
 # effective_paused_days = accumulated vacation_offset_days, plus (only while
-# a vacation is active AND the chore is eligible) the live elapsed time of
-# the in-progress vacation. Callers add this to interval_days wherever they
-# currently do julianday(...) + interval_days arithmetic.
-CHORES_EFFECTIVE_VIEW_SQL = f"""
+# a vacation is active AND the chore's category is pausable-by-default or
+# force-paused) the live elapsed time of the in-progress vacation, plus
+# (only while the chore's room is paused) the live elapsed time of that
+# room pause. Callers add this to interval_days wherever they currently do
+# julianday(...) + interval_days arithmetic.
+#
+# Every joined column is explicitly aliased (cat_name, cat_icon, ...) since
+# `c.*` already includes a `name` column (the chore's own name) - an
+# unaliased `categories.name` would collide with it in sqlite3.Row's
+# column-name lookup and silently corrupt chore names on every read.
+CHORES_EFFECTIVE_VIEW_SQL = """
 CREATE VIEW IF NOT EXISTS chores_effective AS
 SELECT
     c.*,
+    cat.name AS cat_name,
+    cat.icon AS cat_icon,
+    cat.is_vacation_pausable_default AS category_pausable_default,
+    rm.is_paused AS room_is_paused,
+    (
+        CASE
+            WHEN (SELECT is_active FROM vacation_state WHERE id = 1) = 1
+                 AND (
+                     c.vacation_override = 'force_pause'
+                     OR (
+                         (c.vacation_override IS NULL OR c.vacation_override = '')
+                         AND cat.is_vacation_pausable_default = 1
+                     )
+                 )
+            THEN c.vacation_offset_days
+                 + (julianday('now') - julianday((SELECT started_at FROM vacation_state WHERE id = 1)))
+            ELSE c.vacation_offset_days
+        END
+        +
+        CASE
+            WHEN c.room_id IS NOT NULL AND rm.is_paused = 1
+                THEN c.room_pause_offset_days + (julianday('now') - julianday(rm.paused_at))
+            ELSE c.room_pause_offset_days
+        END
+    ) AS effective_paused_days
+FROM chores c
+LEFT JOIN categories cat ON c.category_id = cat.id
+LEFT JOIN rooms rm ON c.room_id = rm.id;
+"""
+
+# Intermediate view definition used only by the v4 migration step, for
+# databases upgrading from v3 that don't have rooms.is_paused /
+# chores.room_pause_offset_days yet (those are added in v5, later in the
+# same migrate_db() run). Fresh installs and post-v5 databases always use
+# the full CHORES_EFFECTIVE_VIEW_SQL above instead.
+CHORES_EFFECTIVE_VIEW_SQL_V4 = """
+CREATE VIEW IF NOT EXISTS chores_effective AS
+SELECT
+    c.*,
+    cat.name AS cat_name,
+    cat.icon AS cat_icon,
+    cat.is_vacation_pausable_default AS category_pausable_default,
     CASE
         WHEN (SELECT is_active FROM vacation_state WHERE id = 1) = 1
              AND (
                  c.vacation_override = 'force_pause'
                  OR (
                      (c.vacation_override IS NULL OR c.vacation_override = '')
-                     AND c.category IN ({_pausable_categories_sql()})
+                     AND cat.is_vacation_pausable_default = 1
                  )
              )
         THEN c.vacation_offset_days
              + (julianday('now') - julianday((SELECT started_at FROM vacation_state WHERE id = 1)))
         ELSE c.vacation_offset_days
     END AS effective_paused_days
-FROM chores c;
+FROM chores c
+LEFT JOIN categories cat ON c.category_id = cat.id;
 """
 
 
@@ -231,7 +316,7 @@ def set_schema_version(conn: sqlite3.Connection, version: int):
 
 
 # Current schema version
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 5
 
 
 def migrate_db():
@@ -285,3 +370,33 @@ def migrate_db():
             """)
             conn.executescript(CHORES_EFFECTIVE_VIEW_SQL)
             set_schema_version(conn, 3)
+
+        if current_version < 4:
+            # v4: user-editable categories (replaces the hardcoded enum)
+            try:
+                conn.execute("ALTER TABLE chores ADD COLUMN category_id TEXT")
+            except Exception:
+                pass  # Column may already exist on fresh DBs
+            conn.executescript(CATEGORIES_TABLE_SQL)
+            conn.execute("UPDATE chores SET category_id = category WHERE category_id IS NULL")
+            conn.executescript("DROP VIEW IF EXISTS chores_effective;")
+            conn.executescript(CHORES_EFFECTIVE_VIEW_SQL_V4)
+            set_schema_version(conn, 4)
+
+        if current_version < 5:
+            # v5: room pause ("remodeling") - freezes all of a room's chores
+            try:
+                conn.execute("ALTER TABLE rooms ADD COLUMN is_paused INTEGER DEFAULT 0")
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE rooms ADD COLUMN paused_at TEXT")
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE chores ADD COLUMN room_pause_offset_days REAL NOT NULL DEFAULT 0")
+            except Exception:
+                pass
+            conn.executescript("DROP VIEW IF EXISTS chores_effective;")
+            conn.executescript(CHORES_EFFECTIVE_VIEW_SQL)
+            set_schema_version(conn, 5)

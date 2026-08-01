@@ -11,7 +11,6 @@ from aether.core import (
     ChoreStatus,
     ChoreWithRoom,
     CompletionLog,
-    Category,
     ChoreService,
 )
 
@@ -50,19 +49,15 @@ class CompleteResponse(BaseModel):
 @router.get("", response_model=list[ChoreWithRoom])
 def list_chores(
     room_id: Optional[str] = Query(None, description="Filter by room ID"),
-    category: Optional[Category] = Query(None, description="Filter by category"),
+    category_id: Optional[str] = Query(None, description="Filter by category ID"),
     active_only: bool = Query(True, description="Only show active chores"),
 ):
-    """Get all chores with optional filters."""
-    if room_id or category:
-        chores = ChoreService.get_all(
-            room_id=room_id,
-            category=category,
-            active_only=active_only,
-        )
-        # Convert to ChoreWithRoom (basic version without room details)
-        return [ChoreWithRoom(**c.model_dump(), room=None) for c in chores]
-    return ChoreService.get_all_with_room()
+    """Get all chores with optional filters, including room details."""
+    return ChoreService.get_all_with_room(
+        room_id=room_id,
+        category_id=category_id,
+        active_only=active_only,
+    )
 
 
 @router.get("/overdue", response_model=list[ChoreStatus])
@@ -83,11 +78,11 @@ def get_house_wide_chores():
     return ChoreService.get_house_wide()
 
 
-@router.get("/category/{category}", response_model=list[ChoreStatus])
-def get_chores_by_category(category: Category):
+@router.get("/category/{category_id}", response_model=list[ChoreStatus])
+def get_chores_by_category(category_id: str):
     """Get all chores of a specific category."""
     from aether.core import Prioritizer
-    return Prioritizer.get_by_category(category)
+    return Prioritizer.get_by_category(category_id)
 
 
 @router.get("/{chore_id}", response_model=Chore)

@@ -5,11 +5,13 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
+from aether import __version__
+
 console = Console()
 
 
 @click.group()
-@click.version_option(version="0.3.0")
+@click.version_option(version=__version__)
 def main():
     """Aether - Home Concierge.
 
@@ -103,9 +105,6 @@ def briefing():
             console.print(f"  · {chore.name} {room} [dim]~{chore.estimated_minutes}min[/dim]")
     else:
         console.print("  [green]All caught up![/green]")
-
-    if brief.rooms_needing_attention:
-        console.print(f"\n[dim]Rooms needing attention: {', '.join(brief.rooms_needing_attention)}[/dim]")
 
 
 @main.command("quick")

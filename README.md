@@ -20,7 +20,10 @@ Aether lifts the mental burden of remembering what needs to be done around your 
 - **Freshness scores** — Room health at a glance; stays green while you have plenty of time, decays only in the final stretch before a task is due
 - **"I have X minutes"** — Get prioritized tasks that fit your time
 - **Morning briefing** — ~15 min of high-impact suggestions
-- **Checklists** — Scenarios like "Parents visiting" or "Sleepover"; create, edit, and delete them; items sorted by due date so the most urgent always floats to the top; at-a-glance overdue count and estimated time on the list view
+- **Checklists** — Scenarios like "Parents visiting" or "Sleepover"; create, edit, and delete them; add multiple chores at once; items sorted by due date so the most urgent always floats to the top; at-a-glance overdue count and estimated time on the list view
+- **Rooms** — Add, rename, reorder, or pause a room (e.g. while remodeling) to freeze all of its chores until you unpause it
+- **Categories** — Fully editable: add, rename, delete, reorder, and set whether each one pauses by default during vacation mode
+- **Vacation mode** — Pause occupancy-driven chores while you're away, with a history of past trips; managed from Settings
 
 ### Smart
 
@@ -81,13 +84,23 @@ All endpoints available at `/api`:
 - `GET /api/dashboard/quick-clean?minutes=30` — Prioritized list
 - `GET /api/rooms` — List rooms with freshness
 - `GET /api/rooms/{id}/chores` — Chores for a room
-- `GET /api/chores` — List all chores
+- `POST /api/rooms` / `PUT /api/rooms/{id}` / `DELETE /api/rooms/{id}` — Create, update, or delete a room
+- `POST /api/rooms/reorder` — Reorder rooms
+- `POST /api/rooms/{id}/pause` / `POST /api/rooms/{id}/unpause` — Freeze or resume a room's chores
+- `GET /api/chores` — List chores (optional `room_id` / `category_id` filters), including room details
 - `POST /api/chores/{id}/complete` — Mark complete
+- `GET /api/categories` — List categories
+- `POST /api/categories` / `PUT /api/categories/{id}` / `DELETE /api/categories/{id}` — Create, update, or delete a category (delete is blocked while any chore uses it)
+- `POST /api/categories/reorder` — Reorder categories
 - `GET /api/checklists` — List checklists with overdue count and estimated time
 - `GET /api/checklists/{id}` — Checklist with live chore status, sorted by due date
 - `POST /api/checklists` — Create checklist
 - `PUT /api/checklists/{id}` — Update checklist name, description, or icon
+- `POST /api/checklists/{id}/chores/bulk` — Add multiple chores to a checklist at once
 - `DELETE /api/checklists/{id}` — Delete checklist
+- `GET /api/vacation` — Current vacation status
+- `POST /api/vacation/start` / `POST /api/vacation/end` — Start or end vacation mode
+- `GET /api/vacation/history` — Past vacations
 
 ## Tech Stack
 

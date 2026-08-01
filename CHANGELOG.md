@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0
+
+### Settings tab, editable categories, room pause
+
+- New **Settings** tab: vacation mode controls + history, category management, and a browsable list of all chores (including house-wide ones not yet due, previously only reachable by stumbling into them via a checklist)
+- **Categories** are now user-editable instead of a fixed set: add, rename, delete, and reorder them, and set whether each one pauses by default during vacation mode (was previously hardcoded in code)
+- **Room pause** — pause an individual room (e.g. while remodeling) to freeze all of its chores' countdowns regardless of category, independent of vacation mode; unpausing shifts due dates forward by the paused length
+- Rooms can now be added, renamed, re-iconed, reordered, and deleted from the app — the API already supported this, but there was no UI for it
+- Checklists: adding chores is now multi-select instead of one at a time
+- Vacation mode moved off the Home dashboard: replaced by a small status chip, with the actual start/end controls and a new history view living in Settings
+- Home dashboard decluttered: the "N things worth ~M minutes" line merged into the "Suggested" section header instead of duplicating it, and "Rooms needing attention" was removed (the Rooms tab's per-room freshness bar already covers this)
+- Visual refresh: a display serif font for headings, room/category/checklist icons switched from emoji to a consistent line-icon set (existing emoji data still renders), and refined freshness bar/status-dot styling
+- Fixed: seeded room-specific chores were being created as house-wide due to a bug in the seeder; `GET /chores` now returns room details even when a filter is applied
+- Fixed: `aether --version` reported a stale `0.3.0` regardless of the actual package version
+
 ## 0.5.0
 
 ### Vacation mode

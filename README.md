@@ -101,6 +101,7 @@ All endpoints available at `/api`:
 - `GET /api/vacation` — Current vacation status
 - `POST /api/vacation/start` / `POST /api/vacation/end` — Start or end vacation mode
 - `GET /api/vacation/history` — Past vacations
+- `GET /api/settings` / `PUT /api/settings` — App-wide settings (currently: optional household name, used in the Home greeting)
 
 ## Tech Stack
 

@@ -35,6 +35,8 @@ from .models import (
     VacationEndResult,
     VacationLogEntry,
     ChoreEligibility,
+    AppSettings,
+    AppSettingsUpdate,
     is_vacation_eligible,
 )
 
@@ -47,6 +49,7 @@ from .services import (
     ChecklistService,
     Prioritizer,
     VacationService,
+    AppSettingsService,
 )
 
 __all__ = [
@@ -79,6 +82,8 @@ __all__ = [
     "VacationEndResult",
     "VacationLogEntry",
     "ChoreEligibility",
+    "AppSettings",
+    "AppSettingsUpdate",
     "is_vacation_eligible",
     # Database
     "init_db",
@@ -92,4 +97,5 @@ __all__ = [
     "ChecklistService",
     "Prioritizer",
     "VacationService",
+    "AppSettingsService",
 ]

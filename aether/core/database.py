@@ -157,6 +157,13 @@ CREATE TABLE IF NOT EXISTS vacation_log (
     chores_affected INTEGER NOT NULL DEFAULT 0
 );
 
+-- App-wide settings (singleton row, same pattern as vacation_state)
+CREATE TABLE IF NOT EXISTS app_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    household_name TEXT
+);
+INSERT OR IGNORE INTO app_settings (id, household_name) VALUES (1, NULL);
+
 -- Indexes for common queries
 -- NOTE: idx_chores_category_id is intentionally NOT created here. On a
 -- fresh install the chores table (with category_id) is created above in
@@ -325,7 +332,7 @@ def set_schema_version(conn: sqlite3.Connection, version: int):
 
 
 # Current schema version
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 
 def migrate_db():
@@ -410,3 +417,14 @@ def migrate_db():
             conn.executescript("DROP VIEW IF EXISTS chores_effective;")
             conn.executescript(CHORES_EFFECTIVE_VIEW_SQL)
             set_schema_version(conn, 5)
+
+        if current_version < 6:
+            # v6: app-wide settings (currently just an optional household name)
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    household_name TEXT
+                );
+                INSERT OR IGNORE INTO app_settings (id, household_name) VALUES (1, NULL);
+            """)
+            set_schema_version(conn, 6)

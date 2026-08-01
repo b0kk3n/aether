@@ -396,6 +396,26 @@ function renderVacationChip(status) {
   return `<div class="vacation-chip">${ICON_SVGS.vacation} Vacation mode active</div>`;
 }
 
+function renderFreshnessRing(percent) {
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - percent / 100);
+  const stateClass = getFreshnessClass(percent);
+  return `
+    <div class="freshness-ring">
+      <svg viewBox="0 0 120 120">
+        <circle class="freshness-ring-track" cx="60" cy="60" r="${radius}" fill="none"></circle>
+        <circle class="freshness-ring-arc ${stateClass}" cx="60" cy="60" r="${radius}" fill="none"
+          stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round"></circle>
+      </svg>
+      <div class="freshness-ring-label">
+        <div class="freshness-ring-percent">${percent}%</div>
+        <div class="freshness-ring-caption">fresh</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderHomeView(briefing, vacationStatus) {
   const hasSuggested = briefing.suggested_chores.length > 0;
   const html = `
@@ -403,6 +423,8 @@ function renderHomeView(briefing, vacationStatus) {
       <div class="greeting-text">${briefing.greeting}.</div>
       ${renderVacationChip(vacationStatus)}
     </div>
+
+    ${renderFreshnessRing(briefing.overall_freshness)}
 
     ${hasSuggested ? `
       <div class="section-header">
@@ -420,7 +442,7 @@ function renderHomeView(briefing, vacationStatus) {
     `}
 
     <div class="section-header">
-      <span class="section-title">I have time</span>
+      <span class="section-title">I have&hellip;</span>
     </div>
 
     <div class="quick-time">
@@ -1650,20 +1672,46 @@ function dismissVacationModal() {
 async function loadSettingsView() {
   appContent.innerHTML = '<div class="loading">Loading...</div>';
   try {
-    const status = await api('/vacation');
-    renderSettingsView(status);
+    const [status, appSettings] = await Promise.all([
+      api('/vacation'),
+      api('/settings'),
+    ]);
+    renderSettingsView(status, appSettings);
   } catch (err) {
     appContent.innerHTML = '<div class="empty-state">Could not load settings</div>';
   }
 }
 
-function renderSettingsView(status) {
+function renderSettingsView(status, appSettings) {
   const html = `
     <div class="greeting">
       <div class="greeting-text">Settings</div>
     </div>
 
     <div class="section-header">
+      <span class="section-title">Personalize</span>
+    </div>
+    <div class="settings-panel">
+      <label class="form-label" for="settings-household-name">Your name</label>
+      <input type="text" id="settings-household-name" class="form-input"
+        placeholder="Used in the Home greeting" autocomplete="off"
+        value="${(appSettings.household_name || '').replace(/"/g, '&quot;')}"
+        onblur="saveHouseholdName()" />
+    </div>
+
+    <div class="section-header" style="margin-top: var(--space-lg);">
+      <span class="section-title">Manage</span>
+    </div>
+    <a href="#" class="settings-row" onclick="loadView('settings', 'categories'); return false;">
+      <span>Categories</span>
+      ${ICON_SVGS.chevronRight}
+    </a>
+    <a href="#" class="settings-row" onclick="loadView('settings', 'chores'); return false;">
+      <span>All chores</span>
+      ${ICON_SVGS.chevronRight}
+    </a>
+
+    <div class="section-header" style="margin-top: var(--space-lg);">
       <span class="section-title">Vacation mode</span>
     </div>
     <div class="settings-panel">
@@ -1682,21 +1730,23 @@ function renderSettingsView(status) {
       <span>Vacation history</span>
       ${ICON_SVGS.chevronRight}
     </a>
-
-    <div class="section-header" style="margin-top: var(--space-lg);">
-      <span class="section-title">Manage</span>
-    </div>
-    <a href="#" class="settings-row" onclick="loadView('settings', 'categories'); return false;">
-      <span>Categories</span>
-      ${ICON_SVGS.chevronRight}
-    </a>
-    <a href="#" class="settings-row" onclick="loadView('settings', 'chores'); return false;">
-      <span>All chores</span>
-      ${ICON_SVGS.chevronRight}
-    </a>
   `;
 
   appContent.innerHTML = html;
+}
+
+async function saveHouseholdName() {
+  const input = document.getElementById('settings-household-name');
+  if (!input) return;
+  const name = input.value.trim();
+  try {
+    await api('/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ household_name: name || null }),
+    });
+  } catch (err) {
+    console.error('Failed to save name:', err);
+  }
 }
 
 async function loadSettingsVacationHistoryView() {
@@ -2707,3 +2757,4 @@ window.confirmDeleteCategory = confirmDeleteCategory;
 window.deleteCategoryConfirmed = deleteCategoryConfirmed;
 window.dismissCategoryForm = dismissCategoryForm;
 window.onSettingsChoresFilterChange = onSettingsChoresFilterChange;
+window.saveHouseholdName = saveHouseholdName;

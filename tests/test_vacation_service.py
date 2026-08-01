@@ -4,7 +4,6 @@ import pytest
 
 from aether.core.database import get_db, init_db
 from aether.core.models import (
-    Category,
     ChoreCreate,
     ChoreUpdate,
     RoomCreate,
@@ -15,6 +14,9 @@ from aether.core.services.chore_service import ChoreService
 from aether.core.services.room_service import RoomService
 from aether.core.services.vacation_service import VacationService
 
+VACUUM = "vacuum"
+MAINTAIN = "maintain"
+
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
@@ -24,13 +26,13 @@ def db(tmp_path, monkeypatch):
     yield
 
 
-def _make_chore(category=Category.VACUUM, interval_days=7, vacation_override=None):
+def _make_chore(category_id=VACUUM, interval_days=7, vacation_override=None):
     room = RoomService.create(RoomCreate(name="Test Room"))
     return ChoreService.create(ChoreCreate(
         name="Test chore",
         room_id=room.id,
         interval_days=interval_days,
-        category=category,
+        category_id=category_id,
         vacation_override=vacation_override,
     ))
 
@@ -44,21 +46,17 @@ def _backdate_vacation_start(days: int):
 
 
 class TestIsVacationEligible:
-    def test_default_pausable_categories(self):
-        for category in [
-            Category.VACUUM, Category.MOP, Category.DUST, Category.DECLUTTER,
-            Category.CLEAN, Category.WASH, Category.WIPE,
-        ]:
-            assert is_vacation_eligible(category, None) is True
+    def test_pausable_category_default(self):
+        assert is_vacation_eligible(True, None) is True
 
-    def test_maintain_not_pausable_by_default(self):
-        assert is_vacation_eligible(Category.MAINTAIN, None) is False
+    def test_non_pausable_category_default(self):
+        assert is_vacation_eligible(False, None) is False
 
     def test_override_force_pause_wins_over_category(self):
-        assert is_vacation_eligible(Category.MAINTAIN, VacationOverride.FORCE_PAUSE) is True
+        assert is_vacation_eligible(False, VacationOverride.FORCE_PAUSE) is True
 
     def test_override_force_exclude_wins_over_category(self):
-        assert is_vacation_eligible(Category.VACUUM, VacationOverride.FORCE_EXCLUDE) is False
+        assert is_vacation_eligible(True, VacationOverride.FORCE_EXCLUDE) is False
 
 
 class TestVacationLifecycle:
@@ -77,7 +75,7 @@ class TestVacationLifecycle:
             VacationService.end()
 
     def test_end_shifts_eligible_chore_due_date(self, db):
-        chore = _make_chore(category=Category.VACUUM, interval_days=7)
+        chore = _make_chore(category_id=VACUUM, interval_days=7)
         baseline_due = chore.due_date
 
         VacationService.start()
@@ -92,7 +90,7 @@ class TestVacationLifecycle:
         assert shift_days == pytest.approx(3, abs=0.1)
 
     def test_end_does_not_shift_maintain_chore(self, db):
-        chore = _make_chore(category=Category.MAINTAIN, interval_days=7)
+        chore = _make_chore(category_id=MAINTAIN, interval_days=7)
         baseline_due = chore.due_date
 
         VacationService.start()
@@ -105,7 +103,7 @@ class TestVacationLifecycle:
 
     def test_maintain_chore_with_force_pause_override_shifts(self, db):
         chore = _make_chore(
-            category=Category.MAINTAIN,
+            category_id=MAINTAIN,
             interval_days=7,
             vacation_override=VacationOverride.FORCE_PAUSE,
         )
@@ -122,7 +120,7 @@ class TestVacationLifecycle:
 
     def test_vacuum_chore_with_force_exclude_override_does_not_shift(self, db):
         chore = _make_chore(
-            category=Category.VACUUM,
+            category_id=VACUUM,
             interval_days=7,
             vacation_override=VacationOverride.FORCE_EXCLUDE,
         )
@@ -139,7 +137,7 @@ class TestVacationLifecycle:
     def test_live_read_during_active_vacation_freezes_due_date(self, db):
         """The countdown should already be frozen while vacation is active,
         not just corrected retroactively when it ends."""
-        chore = _make_chore(category=Category.VACUUM, interval_days=7)
+        chore = _make_chore(category_id=VACUUM, interval_days=7)
         baseline_due = chore.due_date
 
         VacationService.start()
@@ -152,7 +150,7 @@ class TestVacationLifecycle:
 
 class TestChoreUpdateOverride:
     def test_override_persists_and_clears(self, db):
-        chore = _make_chore(category=Category.MAINTAIN)
+        chore = _make_chore(category_id=MAINTAIN)
         assert chore.vacation_override is None
 
         updated = ChoreService.update(

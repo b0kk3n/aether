@@ -4,7 +4,7 @@ Populates the database with initial rooms, chores, and checklists.
 """
 
 from aether.core.database import init_db, reset_db, get_db
-from aether.core.models import RoomCreate, ChoreCreate, ChecklistCreate, Category
+from aether.core.models import RoomCreate, ChoreCreate, ChecklistCreate
 from aether.core.services.room_service import RoomService
 from aether.core.services.chore_service import ChoreService
 from aether.core.services.checklist_service import ChecklistService
@@ -35,14 +35,14 @@ def seed_chores(room_ids: dict[str, str]) -> dict[tuple[str, str], str]:
     for room_name, chores in CHORES_BY_ROOM.items():
         room_id = room_ids.get(room_name)
         for chore_data in chores:
-            name, interval, minutes, category = chore_data[:4]
+            name, interval, minutes, category_id = chore_data[:4]
             notes = chore_data[4] if len(chore_data) > 4 else ""
             chore = ChoreService.create(ChoreCreate(
                 name=name,
-                room_id=None,
+                room_id=room_id,
                 interval_days=interval,
                 estimated_minutes=minutes,
-                category=category,
+                category_id=category_id,
                 notes=notes,
             ))
             chore_ids[(room_name, name)] = chore.id
@@ -50,14 +50,14 @@ def seed_chores(room_ids: dict[str, str]) -> dict[tuple[str, str], str]:
 
     # House-wide chores
     for chore_data in HOUSE_WIDE_CHORES:
-        name, interval, minutes, category = chore_data[:4]
+        name, interval, minutes, category_id = chore_data[:4]
         notes = chore_data[4] if len(chore_data) > 4 else ""
         chore = ChoreService.create(ChoreCreate(
             name=name,
             room_id=None,
             interval_days=interval,
             estimated_minutes=minutes,
-            category=category,
+            category_id=category_id,
             notes=notes,
         ))
         chore_ids[(None, name)] = chore.id
@@ -65,14 +65,14 @@ def seed_chores(room_ids: dict[str, str]) -> dict[tuple[str, str], str]:
 
     # Maintenance chores
     for chore_data in MAINTENANCE_CHORES:
-        name, interval, minutes, category = chore_data[:4]
+        name, interval, minutes, category_id = chore_data[:4]
         notes = chore_data[4] if len(chore_data) > 4 else ""
         chore = ChoreService.create(ChoreCreate(
             name=name,
             room_id=None,
             interval_days=interval,
             estimated_minutes=minutes,
-            category=category,
+            category_id=category_id,
             notes=notes,
         ))
         chore_ids[(None, name)] = chore.id

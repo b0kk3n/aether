@@ -104,9 +104,6 @@ def briefing():
     else:
         console.print("  [green]All caught up![/green]")
 
-    if brief.rooms_needing_attention:
-        console.print(f"\n[dim]Rooms needing attention: {', '.join(brief.rooms_needing_attention)}[/dim]")
-
 
 @main.command("quick")
 @click.argument("minutes", type=int)

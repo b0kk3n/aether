@@ -37,7 +37,21 @@ class RoomService:
             name=room.name,
             icon=room.icon,
             sort_order=room.sort_order,
+            is_paused=False,
+            paused_at=None,
             created_at=datetime.fromisoformat(now),
+        )
+
+    @staticmethod
+    def _row_to_room(row) -> Room:
+        return Room(
+            id=row["id"],
+            name=row["name"],
+            icon=row["icon"],
+            sort_order=row["sort_order"],
+            is_paused=bool(row["is_paused"]) if row["is_paused"] is not None else False,
+            paused_at=datetime.fromisoformat(row["paused_at"]) if row["paused_at"] else None,
+            created_at=datetime.fromisoformat(row["created_at"]),
         )
 
     @staticmethod
@@ -51,13 +65,7 @@ class RoomService:
         if not row:
             return None
 
-        return Room(
-            id=row["id"],
-            name=row["name"],
-            icon=row["icon"],
-            sort_order=row["sort_order"],
-            created_at=datetime.fromisoformat(row["created_at"]),
-        )
+        return RoomService._row_to_room(row)
 
     @staticmethod
     def get_by_name(name: str) -> Optional[Room]:
@@ -70,13 +78,7 @@ class RoomService:
         if not row:
             return None
 
-        return Room(
-            id=row["id"],
-            name=row["name"],
-            icon=row["icon"],
-            sort_order=row["sort_order"],
-            created_at=datetime.fromisoformat(row["created_at"]),
-        )
+        return RoomService._row_to_room(row)
 
     @staticmethod
     def get_all() -> list[Room]:
@@ -86,16 +88,7 @@ class RoomService:
                 "SELECT * FROM rooms ORDER BY sort_order, name"
             ).fetchall()
 
-        return [
-            Room(
-                id=row["id"],
-                name=row["name"],
-                icon=row["icon"],
-                sort_order=row["sort_order"],
-                created_at=datetime.fromisoformat(row["created_at"]),
-            )
-            for row in rows
-        ]
+        return [RoomService._row_to_room(row) for row in rows]
 
     @staticmethod
     def get_all_with_freshness() -> list[RoomWithFreshness]:
@@ -144,6 +137,8 @@ class RoomService:
                         name=room.name,
                         icon=room.icon,
                         sort_order=room.sort_order,
+                        is_paused=room.is_paused,
+                        paused_at=room.paused_at,
                         created_at=room.created_at,
                         freshness_percent=freshness,
                         chore_count=stats["chore_count"] or 0,
@@ -200,11 +195,74 @@ class RoomService:
         return RoomService.get_by_id(room_id)
 
     @staticmethod
-    def delete(room_id: str) -> bool:
-        """Delete a room. Chores will have room_id set to NULL."""
+    def delete(room_id: str) -> tuple[bool, Optional[str]]:
+        """Delete a room. Chores will have room_id set to NULL.
+
+        Blocked while the room is paused: the in-progress freeze is only
+        tracked via the live paused_at timestamp until unpause bakes it into
+        each chore's room_pause_offset_days, so deleting mid-pause would
+        silently lose that credit. Returns (success, error).
+        """
+        room = RoomService.get_by_id(room_id)
+        if not room:
+            return False, None
+        if room.is_paused:
+            return False, "Unpause this room before deleting it."
+
         with get_db() as conn:
             cursor = conn.execute("DELETE FROM rooms WHERE id = ?", (room_id,))
-            return cursor.rowcount > 0
+            return cursor.rowcount > 0, None
+
+    @staticmethod
+    def pause(room_id: str) -> Optional[Room]:
+        """Pause a room, freezing all of its chores' countdowns.
+
+        Unlike vacation mode's category-based eligibility, room pause is
+        unconditional - a remodel blocks all work in the room regardless
+        of chore category.
+        """
+        room = RoomService.get_by_id(room_id)
+        if not room:
+            return None
+        if room.is_paused:
+            raise ValueError("Room is already paused")
+
+        now = datetime.now().isoformat()
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE rooms SET is_paused = 1, paused_at = ? WHERE id = ?",
+                (now, room_id),
+            )
+
+        return RoomService.get_by_id(room_id)
+
+    @staticmethod
+    def unpause(room_id: str) -> Optional[Room]:
+        """Unpause a room, baking the elapsed paused time into its chores.
+
+        Every active chore in the room gets the offset, regardless of
+        category (mirrors pause()'s unconditional freeze).
+        """
+        room = RoomService.get_by_id(room_id)
+        if not room:
+            return None
+        if not room.is_paused or not room.paused_at:
+            raise ValueError("Room is not paused")
+
+        elapsed_days = (datetime.now() - room.paused_at).total_seconds() / 86400
+
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE chores SET room_pause_offset_days = room_pause_offset_days + ? "
+                "WHERE room_id = ? AND is_active = 1",
+                (elapsed_days, room_id),
+            )
+            conn.execute(
+                "UPDATE rooms SET is_paused = 0, paused_at = NULL WHERE id = ?",
+                (room_id,),
+            )
+
+        return RoomService.get_by_id(room_id)
 
     @staticmethod
     def reorder(room_ids: list[str]) -> list[Room]:

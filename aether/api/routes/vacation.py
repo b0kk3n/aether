@@ -1,10 +1,11 @@
 """Vacation mode API routes."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from aether.core import (
     ChoreEligibility,
     VacationEndResult,
+    VacationLogEntry,
     VacationService,
     VacationStatus,
 )
@@ -40,3 +41,9 @@ def end_vacation():
 def get_vacation_eligibility():
     """Preview which active chores would pause if vacation started now."""
     return VacationService.get_eligible_preview()
+
+
+@router.get("/history", response_model=list[VacationLogEntry])
+def get_vacation_history(limit: int = Query(20, ge=1, le=100)):
+    """Past vacations, most recent first."""
+    return VacationService.get_history(limit=limit)

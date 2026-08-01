@@ -1,6 +1,7 @@
 """Checklist API routes."""
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from aether.core import (
     Checklist,
@@ -11,6 +12,11 @@ from aether.core import (
 )
 
 router = APIRouter(prefix="/checklists", tags=["checklists"])
+
+
+class BulkAddChoresRequest(BaseModel):
+    """Request body for adding multiple chores to a checklist at once."""
+    chore_ids: list[str]
 
 
 @router.get("", response_model=list[Checklist])
@@ -45,6 +51,22 @@ def update_checklist(checklist_id: str, update: ChecklistUpdate):
     if not checklist:
         raise HTTPException(status_code=404, detail="Checklist not found")
     return checklist
+
+
+@router.post("/{checklist_id}/chores/bulk", status_code=204)
+def bulk_add_chores_to_checklist(checklist_id: str, request: BulkAddChoresRequest):
+    """Add multiple chores to a checklist at once.
+
+    Registered before the single-chore POST route below - both match
+    POST /{checklist_id}/chores/<something>, and FastAPI/Starlette matches
+    routes in registration order, so this specific path must come first or
+    a request to .../chores/bulk would be swallowed by {chore_id}="bulk".
+    """
+    checklist = ChecklistService.get_by_id(checklist_id)
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist not found")
+
+    ChecklistService.add_chores(checklist_id, request.chore_ids)
 
 
 @router.post("/{checklist_id}/chores/{chore_id}", status_code=204)

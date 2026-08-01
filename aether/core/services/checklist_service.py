@@ -251,26 +251,42 @@ class ChecklistService:
         return ChecklistService.get_by_id(checklist_id)
 
     @staticmethod
-    def add_chore(checklist_id: str, chore_id: str) -> bool:
-        """Add a chore to a checklist."""
+    def add_chores(checklist_id: str, chore_ids: list[str]) -> int:
+        """Append chores to a checklist at incrementing sort_order.
+
+        Skips ones already present or invalid. Returns count actually added.
+        """
+        if not chore_ids:
+            return 0
+
+        added = 0
         with get_db() as conn:
-            # Get max sort order
             max_order = conn.execute(
                 "SELECT MAX(sort_order) FROM checklist_chores WHERE checklist_id = ?",
                 (checklist_id,),
-            ).fetchone()[0] or -1
+            ).fetchone()[0]
+            next_order = (max_order if max_order is not None else -1) + 1
 
-            try:
-                conn.execute(
-                    """
-                    INSERT INTO checklist_chores (checklist_id, chore_id, sort_order)
-                    VALUES (?, ?, ?)
-                    """,
-                    (checklist_id, chore_id, max_order + 1),
-                )
-                return True
-            except Exception:
-                return False
+            for chore_id in chore_ids:
+                try:
+                    conn.execute(
+                        """
+                        INSERT INTO checklist_chores (checklist_id, chore_id, sort_order)
+                        VALUES (?, ?, ?)
+                        """,
+                        (checklist_id, chore_id, next_order),
+                    )
+                    next_order += 1
+                    added += 1
+                except Exception:
+                    continue  # already in checklist, or invalid chore_id
+
+        return added
+
+    @staticmethod
+    def add_chore(checklist_id: str, chore_id: str) -> bool:
+        """Add a single chore to a checklist."""
+        return ChecklistService.add_chores(checklist_id, [chore_id]) == 1
 
     @staticmethod
     def remove_chore(checklist_id: str, chore_id: str) -> bool:

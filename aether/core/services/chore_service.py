@@ -13,7 +13,6 @@ from aether.core.models import (
     CompletionLog,
     CompletionLogCreate,
     Room,
-    Category,
     Priority,
     VacationOverride,
     is_vacation_eligible,
@@ -28,14 +27,15 @@ class ChoreService:
 
     @staticmethod
     def _row_to_chore(row: sqlite3.Row) -> Chore:
-        """Convert database row to Chore model."""
+        """Convert database row (from chores_effective) to Chore model."""
+        row_keys = row.keys()
         return Chore(
             id=row["id"],
             name=row["name"],
             room_id=row["room_id"],
             interval_days=row["interval_days"],
             estimated_minutes=row["estimated_minutes"],
-            category=Category(row["category"]),
+            category_id=row["category_id"],
             notes=row["notes"] or "",
             is_active=bool(row["is_active"]),
             last_completed_at=datetime.fromisoformat(row["last_completed_at"]) if row["last_completed_at"] else None,
@@ -46,7 +46,10 @@ class ChoreService:
             interval_confirmed=bool(row["interval_confirmed"]) if row["interval_confirmed"] is not None else False,
             interval_confirmations=row["interval_confirmations"] if row["interval_confirmations"] is not None else 0,
             vacation_override=VacationOverride(row["vacation_override"]) if row["vacation_override"] else None,
-            vacation_paused_days=row["effective_paused_days"] if row["effective_paused_days"] is not None else 0.0,
+            vacation_paused_days=row["effective_paused_days"] if "effective_paused_days" in row_keys and row["effective_paused_days"] is not None else 0.0,
+            category_pausable_default=bool(row["category_pausable_default"]) if "category_pausable_default" in row_keys and row["category_pausable_default"] is not None else False,
+            category_name=row["cat_name"] if "cat_name" in row_keys else None,
+            category_icon=row["cat_icon"] if "cat_icon" in row_keys else None,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
@@ -59,7 +62,9 @@ class ChoreService:
             name=chore.name,
             room_name=room_name,
             priority=chore.priority,
-            category=chore.category,
+            category=chore.category_name or "",
+            category_id=chore.category_id,
+            category_icon=chore.category_icon,
             days_until_due=chore.days_until_due,
             freshness_percent=chore.freshness_percent,
             is_overdue=chore.is_overdue,
@@ -80,7 +85,7 @@ class ChoreService:
                 """
                 INSERT INTO chores (
                     id, name, room_id, interval_days, estimated_minutes,
-                    category, notes, is_active, vacation_override, created_at
+                    category_id, notes, is_active, vacation_override, created_at
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -90,7 +95,7 @@ class ChoreService:
                     chore.room_id,
                     chore.interval_days,
                     chore.estimated_minutes,
-                    chore.category.value,
+                    chore.category_id,
                     chore.notes,
                     1 if chore.is_active else 0,
                     chore.vacation_override.value if chore.vacation_override else None,
@@ -136,7 +141,7 @@ class ChoreService:
     @staticmethod
     def get_all(
         room_id: Optional[str] = None,
-        category: Optional[Category] = None,
+        category_id: Optional[str] = None,
         active_only: bool = True,
         include_house_wide: bool = True,
     ) -> list[Chore]:
@@ -154,9 +159,9 @@ class ChoreService:
                 conditions.append("room_id = ?")
             params.append(room_id)
 
-        if category is not None:
-            conditions.append("category = ?")
-            params.append(category.value)
+        if category_id is not None:
+            conditions.append("category_id = ?")
+            params.append(category_id)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
@@ -169,18 +174,38 @@ class ChoreService:
         return [ChoreService._row_to_chore(row) for row in rows]
 
     @staticmethod
-    def get_all_with_room() -> list[ChoreWithRoom]:
-        """Get all chores with room details."""
+    def get_all_with_room(
+        room_id: Optional[str] = None,
+        category_id: Optional[str] = None,
+        active_only: bool = True,
+    ) -> list[ChoreWithRoom]:
+        """Get chores with room details, with optional room/category filters."""
+        conditions = []
+        params = []
+
+        if active_only:
+            conditions.append("c.is_active = 1")
+        if room_id is not None:
+            conditions.append("c.room_id = ?")
+            params.append(room_id)
+        if category_id is not None:
+            conditions.append("c.category_id = ?")
+            params.append(category_id)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
         with get_db() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT c.*, r.id as r_id, r.name as r_name, r.icon as r_icon,
-                       r.sort_order as r_sort_order, r.created_at as r_created_at
+                       r.sort_order as r_sort_order, r.is_paused as r_is_paused,
+                       r.paused_at as r_paused_at, r.created_at as r_created_at
                 FROM chores_effective c
                 LEFT JOIN rooms r ON c.room_id = r.id
-                WHERE c.is_active = 1
+                WHERE {where_clause}
                 ORDER BY c.interval_days, c.name
-                """
+                """,
+                params,
             ).fetchall()
 
         result = []
@@ -193,6 +218,8 @@ class ChoreService:
                     name=row["r_name"],
                     icon=row["r_icon"],
                     sort_order=row["r_sort_order"],
+                    is_paused=bool(row["r_is_paused"]),
+                    paused_at=datetime.fromisoformat(row["r_paused_at"]) if row["r_paused_at"] else None,
                     created_at=datetime.fromisoformat(row["r_created_at"]),
                 )
             result.append(ChoreWithRoom(**chore.model_dump(), room=room))
@@ -303,9 +330,9 @@ class ChoreService:
             # Reset duration confirmation when estimate changes
             updates.append("duration_confirmed = 0")
             updates.append("duration_confirmations = 0")
-        if update.category is not None:
-            updates.append("category = ?")
-            params.append(update.category.value)
+        if update.category_id is not None:
+            updates.append("category_id = ?")
+            params.append(update.category_id)
         if update.notes is not None:
             updates.append("notes = ?")
             params.append(update.notes)

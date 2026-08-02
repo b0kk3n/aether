@@ -6,6 +6,7 @@ Handles:
 - Dashboard overviews
 """
 
+import random
 from datetime import datetime
 from typing import Optional
 
@@ -20,6 +21,35 @@ from aether.core.models import (
 from aether.core.database import get_db
 from aether.core.services.room_service import RoomService
 from aether.core.services.chore_service import ChoreService
+from aether.core.services.app_settings_service import AppSettingsService
+
+
+def _build_greeting(hour: int, household_name: Optional[str], suggested_count: int, total_overdue: int) -> str:
+    """Pick a greeting phrase based on time of day and how the home's doing.
+
+    Busy days get the plain time-based greeting (no nagging about backlog);
+    caught-up and light days get a bit of personality instead. A household
+    name, if set, is appended to any variant.
+    """
+    if hour < 12:
+        period = "morning"
+    elif hour < 17:
+        period = "afternoon"
+    else:
+        period = "evening"
+    time_greeting = f"Good {period}"
+
+    if suggested_count == 0:
+        phrase = random.choice(["All caught up", "Nothing on the list", "Home's looking great"])
+    elif suggested_count <= 2 and total_overdue == 0:
+        phrase = random.choice([time_greeting, "Light day ahead", "Just a little something today"])
+    else:
+        phrase = time_greeting
+
+    if household_name:
+        phrase = f"{phrase}, {household_name}"
+
+    return phrase
 
 
 class Prioritizer:
@@ -104,26 +134,29 @@ class Prioritizer:
 
     @staticmethod
     def get_morning_briefing() -> Briefing:
-        """Generate morning briefing with ~15 minutes of suggested tasks.
+        """Generate morning briefing with the top 3 most urgent chores.
 
-        Friendly tone, focused on highest-impact items.
+        Friendly tone, focused on highest-impact items - independent of the
+        "I have..." time-budget feature, which is a separate way to browse.
         """
-        # Get prioritized chores for about 15 minutes
-        quick_list = Prioritizer.get_quick_clean(15)
+        top_urgent = Prioritizer.get_prioritized_chores(limit=3)
+        total_minutes = sum(c.estimated_minutes for c in top_urgent)
 
-        # Determine greeting based on time of day
-        hour = datetime.now().hour
-        if hour < 12:
-            greeting = "Good morning"
-        elif hour < 17:
-            greeting = "Good afternoon"
-        else:
-            greeting = "Good evening"
+        dashboard = Prioritizer.get_dashboard()
+        settings = AppSettingsService.get()
+
+        greeting = _build_greeting(
+            datetime.now().hour,
+            settings.household_name,
+            len(top_urgent),
+            dashboard.total_overdue,
+        )
 
         return Briefing(
             greeting=greeting,
-            suggested_chores=quick_list.chores,
-            total_minutes=quick_list.total_minutes,
+            suggested_chores=top_urgent,
+            total_minutes=total_minutes,
+            overall_freshness=dashboard.overall_freshness,
         )
 
     @staticmethod

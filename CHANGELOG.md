@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0
+
+### Home & style refresh
+
+- Home dashboard gets a focal point: an overall home-freshness ring up top, using data that was already computed but never surfaced
+- "Suggested" is now your top 3 most urgent chores (not always capped at ~15 minutes) - a genuinely different feature from "I have...", not a near-duplicate of it
+- "I have time" renamed to "I have..." to read more naturally with the 15/30/60-minute buttons beneath it
+- The greeting is smaller and has some personality: it varies with how caught-up the home is (light/celebratory copy on quiet days, the plain time-of-day greeting on busy ones - never nagging), and you can optionally set your name in Settings (Personalize) to have it used directly ("Good evening, Judith.")
+- Settings reordered: Personalize and Manage now come before Vacation mode
+- Type system refined to three tiers: the display serif is now reserved for true page-level moments (greeting, view headers, modal titles); checklist card titles and room names get their own distinct card-title font instead of the serif; everything else stays on the plain body font
+- Room name font fixed - was incorrectly using the serif display font, now uses the new card-title tier
+- Freshness bars and status dots lost their glow effect in favor of flat fills, better matching the rest of the design
+
 ## 0.6.1
 
 ### Fix: startup crash on existing installations

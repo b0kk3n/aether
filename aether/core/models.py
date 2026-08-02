@@ -406,6 +406,7 @@ class Briefing(BaseModel):
     greeting: str
     suggested_chores: list[ChoreStatus]
     total_minutes: int
+    overall_freshness: int = 100
 
 
 class QuickCleanList(BaseModel):
@@ -449,3 +450,17 @@ class ChoreEligibility(BaseModel):
     category_name: str
     vacation_override: Optional[VacationOverride] = None
     vacation_eligible: bool
+
+
+# =============================================================================
+# App Settings
+# =============================================================================
+
+class AppSettings(BaseModel):
+    """App-wide settings (singleton)."""
+    household_name: Optional[str] = None
+
+
+class AppSettingsUpdate(BaseModel):
+    """Model for updating app settings."""
+    household_name: Optional[str] = None

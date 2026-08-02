@@ -6,6 +6,7 @@ from .category_service import CategoryService
 from .checklist_service import ChecklistService
 from .prioritizer import Prioritizer
 from .vacation_service import VacationService
+from .app_settings_service import AppSettingsService
 
 __all__ = [
     "RoomService",
@@ -14,4 +15,5 @@ __all__ = [
     "ChecklistService",
     "Prioritizer",
     "VacationService",
+    "AppSettingsService",
 ]

@@ -400,7 +400,9 @@ async function loadProductsView() {
 
     const groupOrder = [];
     if (byCategory.has('__none__')) groupOrder.push({ id: null, name: 'Uncategorized', icon: 'tag' });
-    categories.forEach(c => { if (byCategory.has(c.id)) groupOrder.push(c); });
+    // In edit mode, show every category (even ones with no products yet) so
+    // a freshly-added or now-empty category is still reachable to edit/delete.
+    categories.forEach(c => { if (byCategory.has(c.id) || _productsEditMode) groupOrder.push(c); });
 
     if (products.length === 0) {
       html += `<div class="empty-state"><div class="title">Nothing tracked yet</div><div class="caption">Products show up here once you add them - or link a grocery line to one.</div></div>`;
@@ -414,6 +416,7 @@ async function loadProductsView() {
           <div class="category-group-header">
             ${renderIcon(cat.icon, '')}
             <span class="title">${escapeHTML(cat.name)}</span>
+            ${_productsEditMode && cat.id ? `<button type="button" class="edit-btn" data-action="edit-category" data-category-id="${cat.id}">${renderIcon('pencil')}</button>` : ''}
           </div>
           ${items.map(p => `
             <div class="product-row" data-product-id="${p.id}">
@@ -462,6 +465,15 @@ async function loadProductsView() {
           const productId = e.target.closest('.product-row').dataset.productId;
           const product = products.find(p => p.id === productId);
           openProductEditor(product);
+        });
+      });
+
+      appContent.querySelectorAll('[data-action="edit-category"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const categoryId = btn.dataset.categoryId;
+          const category = categories.find(c => c.id === categoryId);
+          openCategoryEditor(category);
         });
       });
     } else {
@@ -565,6 +577,7 @@ function openCategoryEditor(category) {
     </div>
     <div class="modal-buttons">
       <button type="button" class="modal-btn modal-btn-primary" id="cf-save">Save</button>
+      ${!isNew ? '<button type="button" class="modal-btn modal-btn-danger" id="cf-delete">Delete category</button>' : ''}
       <button type="button" class="modal-btn modal-btn-secondary" id="cf-cancel">Cancel</button>
     </div>
   `);
@@ -587,6 +600,22 @@ function openCategoryEditor(category) {
       showToast(err.message);
     }
   });
+
+  const deleteBtn = document.getElementById('cf-delete');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      try {
+        await api(`/categories/${category.id}`, { method: 'DELETE' });
+        hideModal();
+        loadProductsView();
+      } catch (err) {
+        // Backend blocks delete while products still reference this
+        // category (409, "N product(s) use this category; reassign or
+        // delete them first.") - surfaced verbatim via the toast.
+        showToast(err.message);
+      }
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

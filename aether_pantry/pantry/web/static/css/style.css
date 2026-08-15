@@ -203,7 +203,10 @@ input, select {
   transition: color var(--transition-fast);
 }
 
-.nav-item .icon { width: 22px; height: 22px; }
+.nav-item svg {
+  width: 24px;
+  height: 24px;
+}
 .nav-item span { font-size: 11px; font-weight: var(--font-weight-medium); }
 
 .nav-item.active { color: var(--text-primary); }
@@ -387,6 +390,7 @@ input, select {
   margin-bottom: var(--space-sm);
 }
 .category-group-header .icon { color: var(--text-secondary); }
+.category-group-header .edit-btn { margin-left: auto; }
 
 .product-row {
   display: flex;

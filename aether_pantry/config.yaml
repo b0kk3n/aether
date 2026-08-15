@@ -1,0 +1,24 @@
+name: Aether Pantry
+version: "0.1.0"
+slug: aether_pantry
+description: "What's low or out at home, so it doesn't have to live in your head."
+url: "https://github.com/b0kk3n/aether"
+arch:
+  - aarch64
+  - armv7
+  - amd64
+startup: application
+boot: auto
+init: false
+ingress: true
+ingress_port: 8100
+panel_icon: mdi:fridge-outline
+panel_title: "Aether Pantry"
+homeassistant_api: false
+host_network: false
+ports:
+  8100/tcp: null
+options:
+  log_level: info
+schema:
+  log_level: list(debug|info|warning|error)

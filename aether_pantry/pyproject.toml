@@ -1,0 +1,45 @@
+[project]
+name = "aether-pantry"
+version = "0.1.0"
+description = "Aether Pantry - what's low or out at home, so it doesn't have to live in your head."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "pydantic>=2.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=24.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+pantry = "pantry.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pantry*"]
+
+[tool.setuptools.package-data]
+"pantry.web" = ["static/**/*", "templates/**/*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]

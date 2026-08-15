@@ -242,8 +242,14 @@ function wireStatusFlip(container, productId, onDone) {
 // Grocery view (hero / default view)
 // ---------------------------------------------------------------------------
 
-async function loadGroceryView() {
-  appContent.innerHTML = `<div class="loading">Loading...</div>`;
+async function loadGroceryView(preserveScroll = false) {
+  // #app-content never actually overflows internally (it grows with .app
+  // to fit its content) - the real scrolling context is the window, so
+  // that's what has to be captured/restored, not the div's own scrollTop.
+  const savedScroll = preserveScroll ? window.scrollY : 0;
+  if (!preserveScroll) {
+    appContent.innerHTML = `<div class="loading">Loading...</div>`;
+  }
 
   try {
     const [items, attention] = await Promise.all([
@@ -299,6 +305,7 @@ async function loadGroceryView() {
     }
 
     appContent.innerHTML = html;
+    if (preserveScroll) window.scrollTo(0, savedScroll);
 
     document.getElementById('grocery-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -308,7 +315,7 @@ async function loadGroceryView() {
       try {
         await api('/grocery-list', { method: 'POST', body: JSON.stringify({ raw_text: text }) });
         input.value = '';
-        loadGroceryView();
+        loadGroceryView(true);
       } catch (err) {
         showToast(err.message);
       }
@@ -320,7 +327,7 @@ async function loadGroceryView() {
         const productId = row.dataset.productId;
         try {
           await api(`/grocery-list/from-product/${productId}`, { method: 'POST' });
-          loadGroceryView();
+          loadGroceryView(true);
         } catch (err) {
           showToast(err.message);
         }
@@ -332,7 +339,7 @@ async function loadGroceryView() {
       row.querySelector('[data-action="check-off"]').addEventListener('click', async () => {
         try {
           await api(`/grocery-list/${itemId}/check-off`, { method: 'POST' });
-          loadGroceryView();
+          loadGroceryView(true);
         } catch (err) {
           showToast(err.message);
         }
@@ -340,7 +347,7 @@ async function loadGroceryView() {
       row.querySelector('[data-action="remove"]').addEventListener('click', async () => {
         try {
           await api(`/grocery-list/${itemId}`, { method: 'DELETE' });
-          loadGroceryView();
+          loadGroceryView(true);
         } catch (err) {
           showToast(err.message);
         }
@@ -355,8 +362,14 @@ async function loadGroceryView() {
 // Products view (All Products)
 // ---------------------------------------------------------------------------
 
-async function loadProductsView() {
-  appContent.innerHTML = `<div class="loading">Loading...</div>`;
+async function loadProductsView(preserveScroll = false) {
+  // #app-content never actually overflows internally (it grows with .app
+  // to fit its content) - the real scrolling context is the window, so
+  // that's what has to be captured/restored, not the div's own scrollTop.
+  const savedScroll = preserveScroll ? window.scrollY : 0;
+  if (!preserveScroll) {
+    appContent.innerHTML = `<div class="loading">Loading...</div>`;
+  }
 
   try {
     const [products, categories, vacation] = await Promise.all([
@@ -435,10 +448,11 @@ async function loadProductsView() {
     });
 
     appContent.innerHTML = html;
+    if (preserveScroll) window.scrollTo(0, savedScroll);
 
     document.getElementById('edit-toggle').addEventListener('click', () => {
       _productsEditMode = !_productsEditMode;
-      loadProductsView();
+      loadProductsView(true);
     });
 
     document.getElementById('vacation-toggle').addEventListener('click', async () => {
@@ -450,7 +464,7 @@ async function loadProductsView() {
           await api('/vacation/start', { method: 'POST' });
           showToast('Vacation mode started - interval clocks paused.');
         }
-        loadProductsView();
+        loadProductsView(true);
       } catch (err) {
         showToast(err.message);
       }
@@ -478,7 +492,7 @@ async function loadProductsView() {
       });
     } else {
       appContent.querySelectorAll('.product-row').forEach(row => {
-        wireStatusFlip(row, row.dataset.productId, loadProductsView);
+        wireStatusFlip(row, row.dataset.productId, () => loadProductsView(true));
       });
     }
   } catch (err) {
@@ -540,7 +554,7 @@ function openProductEditor(product) {
         });
       }
       hideModal();
-      loadProductsView();
+      loadProductsView(true);
     } catch (err) {
       showToast(err.message);
     }
@@ -552,7 +566,7 @@ function openProductEditor(product) {
       try {
         await api(`/products/${product.id}`, { method: 'DELETE' });
         hideModal();
-        loadProductsView();
+        loadProductsView(true);
       } catch (err) {
         showToast(err.message);
       }
@@ -595,7 +609,7 @@ function openCategoryEditor(category) {
         await api(`/categories/${category.id}`, { method: 'PUT', body: JSON.stringify({ name, icon }) });
       }
       hideModal();
-      loadProductsView();
+      loadProductsView(true);
     } catch (err) {
       showToast(err.message);
     }
@@ -607,7 +621,7 @@ function openCategoryEditor(category) {
       try {
         await api(`/categories/${category.id}`, { method: 'DELETE' });
         hideModal();
-        loadProductsView();
+        loadProductsView(true);
       } catch (err) {
         // Backend blocks delete while products still reference this
         // category (409, "N product(s) use this category; reassign or
@@ -671,9 +685,15 @@ async function loadChecklistsView() {
   }
 }
 
-async function loadChecklistDetail(checklistId) {
+async function loadChecklistDetail(checklistId, preserveScroll = false) {
   currentChecklistId = checklistId;
-  appContent.innerHTML = `<div class="loading">Loading...</div>`;
+  // #app-content never actually overflows internally (it grows with .app
+  // to fit its content) - the real scrolling context is the window, so
+  // that's what has to be captured/restored, not the div's own scrollTop.
+  const savedScroll = preserveScroll ? window.scrollY : 0;
+  if (!preserveScroll) {
+    appContent.innerHTML = `<div class="loading">Loading...</div>`;
+  }
 
   try {
     const checklist = await api(`/checklists/${checklistId}`);
@@ -708,17 +728,18 @@ async function loadChecklistDetail(checklistId) {
     }
 
     appContent.innerHTML = html;
+    if (preserveScroll) window.scrollTo(0, savedScroll);
 
     document.getElementById('checklist-edit-btn').addEventListener('click', () => openChecklistEditor(checklist));
     document.getElementById('checklist-add-products-btn').addEventListener('click', () => openAddProductsToChecklist(checklistId));
 
     appContent.querySelectorAll('.product-row').forEach(row => {
       const productId = row.dataset.productId;
-      wireStatusFlip(row, productId, () => loadChecklistDetail(checklistId));
+      wireStatusFlip(row, productId, () => loadChecklistDetail(checklistId, true));
       row.querySelector('[data-action="remove-from-checklist"]').addEventListener('click', async () => {
         try {
           await api(`/checklists/${checklistId}/products/${productId}`, { method: 'DELETE' });
-          loadChecklistDetail(checklistId);
+          loadChecklistDetail(checklistId, true);
         } catch (err) {
           showToast(err.message);
         }
@@ -776,7 +797,7 @@ function openChecklistEditor(checklist) {
           body: JSON.stringify({ name, description, icon }),
         });
         hideModal();
-        loadChecklistDetail(checklist.id);
+        loadChecklistDetail(checklist.id, true);
       }
     } catch (err) {
       showToast(err.message);
@@ -832,7 +853,7 @@ async function openAddProductsToChecklist(checklistId) {
           body: JSON.stringify({ product_ids: ids }),
         });
         hideModal();
-        loadChecklistDetail(checklistId);
+        loadChecklistDetail(checklistId, true);
       } catch (err) {
         showToast(err.message);
       }

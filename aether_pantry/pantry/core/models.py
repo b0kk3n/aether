@@ -10,7 +10,7 @@ Simplified model focused purely on "what's low or out at home":
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 import uuid
 
 
@@ -115,6 +115,14 @@ class Product(ProductBase):
     class Config:
         from_attributes = True
 
+    # These are all derived from stored fields, computed fresh on every
+    # read/response - never written back to the DB. @computed_field is
+    # required (not just @property) for Pydantic v2 to include them in the
+    # JSON a client actually receives; a plain @property is Python-only and
+    # silently vanishes from every API response, which is exactly the bug
+    # this comment is here to stop from recurring.
+
+    @computed_field
     @property
     def effective_interval_days(self) -> Optional[float]:
         """interval_days adjusted for accumulated + in-progress vacation pause."""
@@ -122,11 +130,13 @@ class Product(ProductBase):
             return None
         return self.interval_days + self.vacation_paused_days
 
+    @computed_field
     @property
     def days_since_checked(self) -> float:
         """Days elapsed since last_checked."""
         return (datetime.now() - self.last_checked).total_seconds() / 86400
 
+    @computed_field
     @property
     def next_due(self) -> Optional[datetime]:
         """When this product's interval next elapses, if it has one."""
@@ -134,6 +144,7 @@ class Product(ProductBase):
             return None
         return self.last_checked + timedelta(days=self.effective_interval_days)
 
+    @computed_field
     @property
     def effective_status(self) -> ProductStatus:
         """The status to actually display/sort on.

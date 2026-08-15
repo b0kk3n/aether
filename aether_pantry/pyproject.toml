@@ -1,6 +1,6 @@
 [project]
 name = "aether-pantry"
-version = "0.1.1"
+version = "0.1.2"
 description = "Aether Pantry - what's low or out at home, so it doesn't have to live in your head."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,6 +19,7 @@ dev = [
     "pytest-cov>=4.0.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
+    "httpx>=0.26.0",
 ]
 
 [project.scripts]

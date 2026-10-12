@@ -407,6 +407,28 @@ class ChoreService:
                 if duration_confirmations >= 2:
                     duration_confirmed = True
 
+            # Completing starts a fresh cycle, so pause offsets accumulated
+            # against the previous cycle must not carry over. If a vacation
+            # or room pause is still running, its live elapsed time (added by
+            # chores_effective) is cancelled with a negative offset so only
+            # pause time after this completion counts; end()/unpause() later
+            # bake the full elapsed time in, netting out to exactly that.
+            live = conn.execute(
+                """
+                SELECT
+                    effective_paused_days - vacation_offset_days - room_pause_offset_days
+                        AS total_live,
+                    CASE WHEN room_id IS NOT NULL AND room_is_paused = 1
+                         THEN julianday('now') - julianday(
+                             (SELECT paused_at FROM rooms WHERE id = chores_effective.room_id))
+                         ELSE 0 END AS room_live
+                FROM chores_effective WHERE id = ?
+                """,
+                (chore_id,),
+            ).fetchone()
+            room_live = live["room_live"] or 0.0
+            vacation_live = (live["total_live"] or 0.0) - room_live
+
             # Update chore
             conn.execute(
                 """
@@ -415,7 +437,9 @@ class ChoreService:
                     streak = ?,
                     completion_count = completion_count + 1,
                     duration_confirmed = ?,
-                    duration_confirmations = ?
+                    duration_confirmations = ?,
+                    vacation_offset_days = ?,
+                    room_pause_offset_days = ?
                 WHERE id = ?
                 """,
                 (
@@ -423,6 +447,8 @@ class ChoreService:
                     new_streak,
                     1 if duration_confirmed else 0,
                     duration_confirmations,
+                    -vacation_live,
+                    -room_live,
                     chore_id,
                 ),
             )

@@ -165,3 +165,64 @@ class TestChoreUpdateOverride:
         # Explicitly setting it back to None clears it (inherit category default).
         updated3 = ChoreService.update(chore.id, ChoreUpdate(vacation_override=None))
         assert updated3.vacation_override is None
+
+
+class TestCompletionResetsPauseOffsets:
+    """Completing a chore starts a fresh cycle: pause time from earlier
+    cycles must not push the next due date out."""
+
+    def _due_in_days(self, chore_id):
+        from datetime import datetime
+        chore = ChoreService.get_by_id(chore_id)
+        return (chore.due_date - datetime.now()).total_seconds() / 86400
+
+    def test_old_vacation_offset_cleared_on_complete(self, db):
+        chore = _make_chore(category_id=VACUUM, interval_days=30)
+        VacationService.start()
+        _backdate_vacation_start(5)
+        VacationService.end()
+
+        ChoreService.complete(chore.id)
+        assert self._due_in_days(chore.id) == pytest.approx(30, abs=0.01)
+
+    def test_old_room_pause_offset_cleared_on_complete(self, db):
+        chore = _make_chore(category_id=MAINTAIN, interval_days=30)
+        RoomService.pause(chore.room_id)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE rooms SET paused_at = datetime('now', '-5 days') WHERE id = ?",
+                (chore.room_id,),
+            )
+        RoomService.unpause(chore.room_id)
+
+        ChoreService.complete(chore.id)
+        assert self._due_in_days(chore.id) == pytest.approx(30, abs=0.01)
+
+    def test_complete_during_active_vacation_only_counts_later_pause(self, db):
+        chore = _make_chore(category_id=VACUUM, interval_days=30)
+        VacationService.start()
+        _backdate_vacation_start(5)
+
+        ChoreService.complete(chore.id)
+        assert self._due_in_days(chore.id) == pytest.approx(30, abs=0.01)
+
+        VacationService.end()
+        assert self._due_in_days(chore.id) == pytest.approx(30, abs=0.01)
+
+    def test_complete_during_active_room_pause_only_counts_later_pause(self, db):
+        chore = _make_chore(category_id=VACUUM, interval_days=30)
+        RoomService.pause(chore.room_id)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE rooms SET paused_at = datetime('now', '-5 days') WHERE id = ?",
+                (chore.room_id,),
+            )
+        VacationService.start()
+        _backdate_vacation_start(3)
+
+        ChoreService.complete(chore.id)
+        assert self._due_in_days(chore.id) == pytest.approx(30, abs=0.01)
+
+        VacationService.end()
+        RoomService.unpause(chore.room_id)
+        assert self._due_in_days(chore.id) == pytest.approx(30, abs=0.01)

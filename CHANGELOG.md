@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+### Fix: due dates inflated after vacation/room pause
+
+Completing a chore that had been through vacation mode or a room pause kept the paused days on every later cycle, so e.g. a 30-day chore could show "due in 35 days" right after completion. Completion now starts a clean cycle. If a vacation or room pause is still running when you complete a chore, only pause time after that completion counts. Chores already affected correct themselves on their next completion.
+
 ## 0.7.0
 
 ### Home & style refresh
